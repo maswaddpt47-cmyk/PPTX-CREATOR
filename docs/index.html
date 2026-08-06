@@ -1,0 +1,52 @@
+<!-- redeploy trigger: GitHub Pages build for the QR-code gabarit stalled, forcing a fresh deployment -->
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Générateur de supports — Département 47</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<main class="page">
+  <h1>Mise en forme des supports d'atelier</h1>
+  <p class="lead">
+    Déposez le PPTX source de votre atelier : il sera automatiquement mis en
+    forme selon le gabarit du Département, entièrement dans votre navigateur
+    (aucun fichier n'est envoyé à un serveur).
+  </p>
+
+  <section id="dropzone" class="dropzone" tabindex="0">
+    <div class="dropzone-inner">
+      <p class="dropzone-title">Glissez votre fichier .pptx ici</p>
+      <p class="dropzone-sub">ou cliquez pour sélectionner un fichier</p>
+      <p id="file-name" class="file-name"></p>
+    </div>
+    <input id="file-input" type="file" accept=".pptx" hidden />
+  </section>
+
+  <div class="field">
+    <label for="thematique">Thématique (page de titre) <span class="optional">— optionnel</span></label>
+    <input id="thematique" type="text" placeholder="ex. 3 - Sécurité numérique" />
+    <p class="hint">
+      Si ce champ est laissé vide et qu'aucune information équivalente n'est
+      trouvée dans le fichier source, un message d'alerte rouge apparaîtra à
+      sa place dans le livrable pour que vous le complétiez manuellement.
+    </p>
+  </div>
+
+  <button id="generate-btn" disabled>Générer le PPTX</button>
+
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+</main>
+
+<script src="js/vendor/jszip.min.js"></script>
+<script src="js/gabarit-data.js"></script>
+<script src="js/ooxml.js"></script>
+<script src="js/gabarit.js"></script>
+<script src="js/source-extract.js"></script>
+<script src="js/classifier.js"></script>
+<script src="js/build.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

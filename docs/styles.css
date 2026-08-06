@@ -1,0 +1,161 @@
+:root {
+  color-scheme: light dark;
+  --blue: #0B69B5;
+  --blue-light: #4389BD;
+  --green: #B6C932;
+  --ink: #1F1F1F;
+  --bg: #FFFFFF;
+  --panel: #F4F6F8;
+  --border: #D6DEE6;
+  --red: #D6362C;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--blue);
+  margin: 0 0 0.5rem;
+}
+
+.lead {
+  color: #555;
+  line-height: 1.5;
+  margin: 0 0 2rem;
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--panel);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible,
+.dropzone.dragover {
+  border-color: var(--blue-light);
+  background: #EAF2F8;
+  outline: none;
+}
+
+.dropzone-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0 0 0.25rem;
+}
+
+.dropzone-sub {
+  color: #777;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.file-name {
+  margin: 1rem 0 0;
+  font-weight: 700;
+  color: var(--blue);
+  word-break: break-all;
+}
+
+.field {
+  margin-top: 1.75rem;
+}
+
+.field label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.optional {
+  font-weight: 400;
+  color: #888;
+}
+
+.field input[type="text"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.field input[type="text"]:focus {
+  outline: 2px solid var(--blue-light);
+  border-color: var(--blue-light);
+}
+
+.hint {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0;
+  line-height: 1.4;
+}
+
+button#generate-btn {
+  margin-top: 2rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 1.75rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button#generate-btn:disabled {
+  background: #A9B8C2;
+  cursor: not-allowed;
+}
+
+button#generate-btn:not(:disabled):hover {
+  background: var(--blue-light);
+}
+
+.status {
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.status.error {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.status.success {
+  color: #2E7D32;
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c;
+    --panel: #1c2126;
+    --border: #333b42;
+    --ink: #eee;
+  }
+  .lead, .dropzone-sub, .hint { color: #aaa; }
+  .dropzone:hover, .dropzone:focus-visible, .dropzone.dragover { background: #1a2733; }
+}
