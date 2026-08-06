@@ -1,0 +1,303 @@
+/* Turns an arbitrary uploaded source .pptx into a structured content model:
+   title slide, "Au programme" categories, and a list of content slides each
+   broken into title + intro + heading/body items (or table rows, when a
+   slide's shapes form a clean grid). Generic — no gabarit knowledge here. */
+(function (global) {
+  "use strict";
+
+  const { NS, tag, firstTag } = window.PG_OOXML;
+
+  const STOPWORDS = new Set(
+    (
+      "le la les un une des de du au aux et ou en dans sur pour par avec sans " +
+      "ce cet cette ces son sa ses leur leurs votre vos notre nos vous nous " +
+      "est sont être avoir a ont qui que quoi dont où comme plus moins bien " +
+      "tout tous toute toutes pas ne se ça il elle on y d l qu s c j"
+    ).split(" ")
+  );
+
+  function tokenize(text) {
+    return (text || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+  }
+
+  function readShapes(slideDoc) {
+    const spTree = firstTag(slideDoc, NS.p, "spTree");
+    const shapes = [];
+    for (const child of Array.from(spTree.children)) {
+      const local = child.localName;
+      if (local !== "sp" && local !== "pic" && local !== "graphicFrame") continue;
+      const xfrm = child.getElementsByTagNameNS(NS.a, "off")[0];
+      const ext = child.getElementsByTagNameNS(NS.a, "ext")[0];
+      const pos = xfrm
+        ? {
+            x: parseInt(xfrm.getAttribute("x"), 10),
+            y: parseInt(xfrm.getAttribute("y"), 10),
+            cx: ext ? parseInt(ext.getAttribute("cx"), 10) : 0,
+            cy: ext ? parseInt(ext.getAttribute("cy"), 10) : 0,
+          }
+        : null;
+
+      let text = "";
+      let bold = false;
+      let maxSize = 0;
+      let blipRid = null;
+      if (local === "pic") {
+        const blip = firstTag(child, NS.a, "blip");
+        if (blip) blipRid = blip.getAttributeNS(NS.r, "embed");
+      }
+      if (local === "sp") {
+        const txBody = firstTag(child, NS.p, "txBody");
+        if (txBody) {
+          const paraTexts = [];
+          for (const p of tag(txBody, NS.a, "p")) {
+            let pText = "";
+            for (const r of tag(p, NS.a, "r")) {
+              const t = firstTag(r, NS.a, "t");
+              if (t) pText += t.textContent;
+              const rPr = firstTag(r, NS.a, "rPr");
+              if (rPr) {
+                if (rPr.getAttribute("b") === "1") bold = true;
+                const sz = rPr.getAttribute("sz");
+                if (sz) maxSize = Math.max(maxSize, parseInt(sz, 10));
+              }
+            }
+            paraTexts.push(pText);
+          }
+          text = paraTexts.join("\n").trim();
+        }
+      }
+
+      shapes.push({ kind: local, text, bold, maxSize, pos, blipRid });
+    }
+    return shapes;
+  }
+
+  function isNumericLabel(text) {
+    return /^\d{1,2}$/.test(text.trim());
+  }
+
+  /* Reading order by position (row-major: top-to-bottom, then left-to-right
+     within a row band) — more reliable than raw XML shape order, which some
+     generators (e.g. diagonal step diagrams) don't emit in visual order. */
+  function sortByPosition(shapes) {
+    const YB = 50000; // ~0.05in tolerance for "same row"
+    return shapes.slice().sort((a, b) => {
+      const ay = a.pos ? a.pos.y : 0;
+      const by = b.pos ? b.pos.y : 0;
+      if (Math.abs(ay - by) > YB) return ay - by;
+      const ax = a.pos ? a.pos.x : 0;
+      const bx = b.pos ? b.pos.x : 0;
+      return ax - bx;
+    });
+  }
+
+  /* Split a shape list into {heading, body} items. Headings (short/bold
+     shapes) are ordered top-to-bottom/left-to-right; each then geometrically
+     claims the nearest unclaimed non-heading shape roughly below it at a
+     similar x (its "body") — this matches multi-column card grids (heading
+     directly above its own body, shared row-y across columns) without
+     depending on the source's raw XML shape order, which some generators
+     (e.g. diagonal step diagrams) don't emit in visual/logical order. */
+  function pairItems(rawShapes) {
+    const shapes = rawShapes.filter((s) => s.text && !isNumericLabel(s.text));
+    const headings = [];
+    const bodies = [];
+    for (const s of shapes) {
+      const looksLikeHeading = s.text.length <= 90 && (s.bold || s.maxSize >= 1500);
+      (looksLikeHeading ? headings : bodies).push(s);
+    }
+
+    if (headings.length === 0) {
+      return shapes.map((s) => ({ heading: "", body: s.text }));
+    }
+
+    const orderedHeadings = sortByPosition(headings);
+    const claimed = new Set();
+    const X_TOLERANCE = 500000; // ~0.55in: same "column" as its heading
+
+    const items = orderedHeadings.map((h) => {
+      let best = null;
+      let bestDist = Infinity;
+      for (const b of bodies) {
+        if (claimed.has(b) || !b.pos || !h.pos) continue;
+        const dx = Math.abs(b.pos.x - h.pos.x);
+        if (dx > X_TOLERANCE) continue;
+        const dy = b.pos.y - h.pos.y;
+        const dist = dy >= 0 ? dy : Math.abs(dy) + 1e7; // strongly prefer bodies below their heading
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = b;
+        }
+      }
+      if (best) claimed.add(best);
+      return { heading: h.text, body: best ? best.text : "" };
+    });
+
+    for (const b of bodies) {
+      if (!claimed.has(b)) items.push({ heading: "", body: b.text });
+    }
+    return items;
+  }
+
+  /* Detect a grid of short text shapes (used for slides that fake a table
+     with individually positioned cells, e.g. pptxgenjs-built comparisons). */
+  function detectTable(shapes) {
+    const cells = shapes.filter((s) => s.kind === "sp" && s.text && s.pos);
+    if (cells.length < 9) return null;
+
+    const bucket = (v) => Math.round(v / 150000);
+    const xVals = [...new Set(cells.map((c) => bucket(c.pos.x)))].sort((a, b) => a - b);
+    const yVals = [...new Set(cells.map((c) => bucket(c.pos.y)))].sort((a, b) => a - b);
+    const xBuckets = new Map(xVals.map((v, i) => [v, i]));
+    const yBuckets = new Map(yVals.map((v, i) => [v, i]));
+    const nCols = xBuckets.size;
+    const nRows = yBuckets.size;
+    if (nCols < 3 || nRows < 3) return null;
+    if (cells.length < nCols * nRows * 0.7) return null;
+
+    const grid = Array.from({ length: nRows }, () => new Array(nCols).fill(""));
+    for (const c of cells) {
+      const r = yBuckets.get(bucket(c.pos.y));
+      const col = xBuckets.get(bucket(c.pos.x));
+      grid[r][col] = c.text;
+    }
+    return { headerRow: grid[0], rows: grid.slice(1) };
+  }
+
+  function extractSlideContent(shapes) {
+    const textShapes = shapes.filter((s) => s.text);
+    if (textShapes.length === 0) return null;
+
+    const title = textShapes[0].text;
+    let rest = textShapes.slice(1);
+
+    let intro = "";
+    let introShape = null;
+    if (rest.length && rest[0].text.length >= 70 && rest[0].pos && rest[0].pos.cx > 3000000) {
+      introShape = rest[0];
+      intro = introShape.text;
+      rest = rest.slice(1);
+    }
+
+    const excluded = new Set([textShapes[0], introShape].filter(Boolean));
+    const table = detectTable(shapes.filter((s) => !excluded.has(s)));
+    const items = table ? [] : pairItems(rest);
+
+    // 1.2M EMU (~1.3in) floor excludes small per-item icon glyphs (~0.3in)
+    // that sit inline with a heading rather than serving as the slide's
+    // illustration.
+    const ILLUSTRATION_MIN = 1200000;
+    const pics = shapes.filter(
+      (s) => s.kind === "pic" && s.blipRid && s.pos && s.pos.cx >= ILLUSTRATION_MIN && s.pos.cy >= ILLUSTRATION_MIN
+    );
+    let imageRid = null;
+    if (pics.length) {
+      pics.sort((a, b) => b.pos.cx * b.pos.cy - a.pos.cx * a.pos.cy);
+      imageRid = pics[0].blipRid;
+    }
+
+    return { title, intro, items, table, imageRid };
+  }
+
+  function resolveRelTarget(baseDir, target) {
+    if (target.startsWith("/")) return target.slice(1);
+    const parts = baseDir.split("/").concat(target.split("/"));
+    const out = [];
+    for (const part of parts) {
+      if (part === "" || part === ".") continue;
+      if (part === "..") out.pop();
+      else out.push(part);
+    }
+    return out.join("/");
+  }
+
+  /* Resolve a slide-local blip rId to raw image bytes + extension via that
+     slide's own .rels file (rels Targets are relative to ppt/slides/, the
+     directory of the slide part itself — not its _rels subfolder). */
+  async function resolveSlideImage(pkg, slideNum, rid) {
+    if (!rid) return null;
+    const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+    if (!pkg.has(relsPath)) return null;
+    const relsDoc = await pkg.readXml(relsPath);
+    const rel = tag(relsDoc, NS.rel, "Relationship").find((r) => r.getAttribute("Id") === rid);
+    if (!rel) return null;
+    const mediaPath = resolveRelTarget("ppt/slides", rel.getAttribute("Target"));
+    if (!pkg.has(mediaPath)) return null;
+    const bytes = await pkg.bytes(mediaPath);
+    const ext = mediaPath.split(".").pop().toLowerCase();
+    return { bytes, ext };
+  }
+
+  const CLOSING_KEYWORDS = ["recapitulat", "conclusion", "resume", "bilan"];
+
+  function looksLikeClosing(title) {
+    const norm = title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+    return CLOSING_KEYWORDS.some((k) => norm.includes(k));
+  }
+
+  /* pkg: PptxPackage of the uploaded source deck. Returns:
+     { title: {main, intro, tags}, programme: [{heading,body}],
+       contentSlides: [{num,title,intro,items,table}], closing: {...}|null } */
+  async function extractSourceModel(pkg) {
+    const slideNums = pkg
+      .listFiles()
+      .map((f) => f.match(/^ppt\/slides\/slide(\d+)\.xml$/))
+      .filter(Boolean)
+      .map((m) => parseInt(m[1], 10))
+      .sort((a, b) => a - b);
+
+    if (slideNums.length < 3) {
+      throw new Error("Le fichier source doit contenir au moins 3 diapositives.");
+    }
+
+    const docs = {};
+    for (const n of slideNums) docs[n] = await pkg.readXml(`ppt/slides/slide${n}.xml`);
+
+    const titleShapes = readShapes(docs[slideNums[0]]);
+    const titleText = titleShapes.filter((s) => s.text);
+    const title = {
+      main: titleText[0] ? titleText[0].text : "",
+      intro: titleText[1] ? titleText[1].text : "",
+      tags: titleText.slice(2).map((s) => s.text),
+    };
+
+    const programmeShapes = readShapes(docs[slideNums[1]]);
+    const programmeItems = pairItems(
+      programmeShapes.filter((s) => s.text && !isNumericLabel(s.text)).slice(2)
+    );
+    const programme = programmeItems.map((it) => ({
+      heading: it.heading || it.body.slice(0, 40),
+      body: it.body,
+    }));
+
+    const contentNums = slideNums.slice(2);
+    const contentSlides = [];
+    let closing = null;
+    for (let i = 0; i < contentNums.length; i++) {
+      const num = contentNums[i];
+      const shapes = readShapes(docs[num]);
+      const extracted = extractSlideContent(shapes);
+      if (!extracted) continue;
+      const image = await resolveSlideImage(pkg, num, extracted.imageRid);
+      const entry = { num, ...extracted, image };
+      if (i === contentNums.length - 1 && looksLikeClosing(entry.title)) {
+        closing = entry;
+      } else {
+        contentSlides.push(entry);
+      }
+    }
+
+    return { title, programme, contentSlides, closing, tokenize };
+  }
+
+  global.PG_SOURCE = { extractSourceModel, tokenize, readShapes, pairItems };
+})(window);
