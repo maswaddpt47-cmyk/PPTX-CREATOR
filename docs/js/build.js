@@ -154,7 +154,7 @@
   }
 
   async function generateDeck(gabaritBuffer, sourceBuffer, options) {
-    options = Object.assign({ thematique: "" }, options);
+    options = Object.assign({ titre: "", thematique: "" }, options);
 
     const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
     const deck = new DeckBuilder(gabaritPkg);
@@ -164,7 +164,8 @@
     const model = await extractSourceModel(sourcePkg);
 
     const doc1 = await deck.loadSlideDoc(1);
-    G.setTitle(doc1, model.title.main, { missing: !model.title.main, fieldLabel: "titre de l'atelier" });
+    const titre = options.titre.trim() || model.title.main;
+    G.setTitle(doc1, titre, { missing: !titre, fieldLabel: "titre de l'atelier" });
     G.setEyebrow(doc1, options.thematique);
     deck.saveSlideDoc(1, doc1);
 

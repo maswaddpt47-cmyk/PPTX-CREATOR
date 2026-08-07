@@ -4,6 +4,7 @@
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("file-input");
   const fileNameEl = document.getElementById("file-name");
+  const titreInput = document.getElementById("titre");
   const thematiqueInput = document.getElementById("thematique");
   const generateBtn = document.getElementById("generate-btn");
   const statusEl = document.getElementById("status");
@@ -69,6 +70,7 @@
       const sourceBuffer = await sourceFile.arrayBuffer();
 
       const { blob } = await window.PG_BUILD.generateDeck(gabaritBuffer, sourceBuffer, {
+        titre: titreInput.value,
         thematique: thematiqueInput.value,
       });
 
