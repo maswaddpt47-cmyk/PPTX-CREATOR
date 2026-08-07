@@ -153,16 +153,13 @@
     return clone;
   }
 
-  async function generateDeck(gabaritBuffer, sourceBuffer, options) {
-    options = Object.assign({ titre: "", thematique: "" }, options);
-
-    const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
-    const deck = new DeckBuilder(gabaritPkg);
-    await deck.init();
-
-    const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
-    const model = await extractSourceModel(sourcePkg);
-
+  /* Renders a content model (title/programme/contentSlides/closing — the
+     same shape extractSourceModel() produces) into an already-init()'d
+     DeckBuilder and sets the deck's final slide order. Shared by both
+     generateDeck() (source = an uploaded PPTX) and generatePixDeck() in
+     pix-build.js (source = OCR'd PIX screenshots matched against the theme
+     library) so the two entry points don't duplicate the rendering pipeline. */
+  async function assembleDeck(deck, model, options) {
     const doc1 = await deck.loadSlideDoc(1);
     const titre = options.titre.trim() || model.title.main;
     G.setTitle(doc1, titre, { missing: !titre, fieldLabel: "titre de l'atelier" });
@@ -217,9 +214,23 @@
     orderedRelIds.push(deck.relIdForExistingSlide(10));
 
     deck.setFinalOrder(orderedRelIds);
+    return { groups };
+  }
+
+  async function generateDeck(gabaritBuffer, sourceBuffer, options) {
+    options = Object.assign({ titre: "", thematique: "" }, options);
+
+    const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
+    const deck = new DeckBuilder(gabaritPkg);
+    await deck.init();
+
+    const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
+    const model = await extractSourceModel(sourcePkg);
+
+    const { groups } = await assembleDeck(deck, model, options);
     const blob = await deck.finalize();
     return { blob, model, groups };
   }
 
-  global.PG_BUILD = { generateDeck };
+  global.PG_BUILD = { generateDeck, assembleDeck, renderContentSlide, getImageDimensions };
 })(window);

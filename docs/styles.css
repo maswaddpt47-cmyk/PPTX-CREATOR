@@ -75,8 +75,60 @@ h1 {
   word-break: break-all;
 }
 
+.mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mode-tab {
+  font: inherit;
+  font-weight: 700;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0.6rem 0.25rem;
+  margin-bottom: -1px;
+  color: #777;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.mode-panel[hidden] {
+  display: none;
+}
+
+.pix-summary {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.pix-summary ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.pix-summary .unmatched {
+  color: var(--red);
+}
+
 .field {
   margin-top: 1.75rem;
+}
+
+.field input[type="file"] {
+  display: block;
+  font: inherit;
 }
 
 .field label {
