@@ -72,19 +72,31 @@
     try {
       const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
       if (ext === "png" && bytes.length >= 24 && dv.getUint32(0) === 0x89504e47) {
-        return { width: dv.getUint32(16), height: dv.getUint32(20) };
+        const width = dv.getUint32(16);
+        const height = dv.getUint32(20);
+        if (width > 0 && height > 0) return { width, height };
       }
       if (ext === "jpg" || ext === "jpeg") {
+        // Standalone markers carry no length field (and, critically, no
+        // dimensions) — RST0-RST7 only ever appear inside entropy-coded
+        // scan data, but TEM (0x01) can legitimately appear in the header.
+        // Treating any of these as "has a 2-byte length to skip", like a
+        // naive scanner would, desyncs the walk and can return garbage
+        // width/height read from unrelated bytes instead of stopping.
+        const STANDALONE = new Set([0x01, 0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7]);
         let offset = 2;
         while (offset + 9 < bytes.length) {
           if (dv.getUint8(offset) !== 0xff) break;
           const marker = dv.getUint8(offset + 1);
-          if (marker === 0xd8 || marker === 0xd9) {
+          if (marker === 0xd8 || marker === 0xd9 || STANDALONE.has(marker)) {
             offset += 2;
             continue;
           }
           if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-            return { height: dv.getUint16(offset + 5), width: dv.getUint16(offset + 7) };
+            const height = dv.getUint16(offset + 5);
+            const width = dv.getUint16(offset + 7);
+            if (width > 0 && height > 0) return { width, height };
+            break;
           }
           offset += 2 + dv.getUint16(offset + 2);
         }
@@ -95,7 +107,12 @@
     return null;
   }
 
+  /* dims of 0 (or a getImageDimensions parsing miss that slipped through)
+     would otherwise divide-by-zero into Infinity/NaN offsets — invalid
+     OOXML that PowerPoint silently strips on open. Falling back to the
+     slot as-is is exactly what happens when dims is null already. */
   function fitContain(slot, imgW, imgH) {
+    if (!(imgW > 0) || !(imgH > 0)) return slot;
     const slotAspect = slot.cx / slot.cy;
     const imgAspect = imgW / imgH;
     let cx, cy;
@@ -143,9 +160,14 @@
     }
 
     const image = await pickImage(slide);
+    // importMedia() returns null for an unrecognized image format (e.g. a
+    // codec PowerPoint itself wouldn't render) — treat that exactly like no
+    // image at all rather than embedding a part PowerPoint will refuse to
+    // read and strip on open.
+    const mediaPath = image ? deck.importMedia(image.bytes, image.ext) : null;
     const clone = await deck.cloneSlide(7);
     const doc = await deck.loadSlideDoc(clone.num);
-    const hasImage = !!image;
+    const hasImage = !!mediaPath;
     const items = slide.items.length
       ? slide.items
       : [{ heading: "", body: G.alertText("contenu de cette diapositive") }];
@@ -159,7 +181,6 @@
     deck.saveSlideDoc(clone.num, doc);
 
     if (hasImage) {
-      const mediaPath = deck.importMedia(image.bytes, image.ext);
       const rId = await deck.addSlideImageRel(clone.num, mediaPath);
       const dims = getImageDimensions(image.bytes, image.ext);
       const rect = dims ? fitContain(imageSlot, dims.width, dims.height) : imageSlot;

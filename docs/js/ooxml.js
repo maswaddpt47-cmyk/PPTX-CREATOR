@@ -21,12 +21,16 @@
     png: "image/png",
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
+    jpe: "image/jpeg",
+    jfif: "image/jpeg",
     gif: "image/gif",
     bmp: "image/bmp",
     tiff: "image/tiff",
+    tif: "image/tiff",
     emf: "image/x-emf",
     wmf: "image/x-wmf",
     svg: "image/svg+xml",
+    webp: "image/webp",
   };
 
   function tag(root, ns, local) {
@@ -280,16 +284,23 @@
 
     /* Write raw image bytes as a new ppt/media part, adding a Content_Types
        Default entry for the extension if this is the first part using it.
-       Returns the new part's path (e.g. "ppt/media/image42.jpg"). */
+       Returns the new part's path (e.g. "ppt/media/image42.jpg"), or null
+       if the extension isn't a recognized image type — PowerPoint refuses
+       to load a <p:pic> blip pointing at a part declared as generic
+       application/octet-stream, which reproduces as exactly this: "some
+       content could not be read and was removed" on file open. Skipping
+       the image is safer than embedding something PowerPoint will strip
+       anyway. Callers must check for null. */
     importMedia(bytes, ext) {
       const cleanExt = ext.toLowerCase().replace(/^\./, "");
+      if (!IMAGE_CONTENT_TYPES[cleanExt] && !this._knownExtensions.has(cleanExt)) return null;
       const num = this._nextMediaNum++;
       const path = `ppt/media/image${num}.${cleanExt}`;
       this.pkg.setBytes(path, bytes);
       if (!this._knownExtensions.has(cleanExt)) {
         const el = this.contentTypesDoc.createElementNS(NS.ct, "Default");
         el.setAttribute("Extension", cleanExt);
-        el.setAttribute("ContentType", IMAGE_CONTENT_TYPES[cleanExt] || "application/octet-stream");
+        el.setAttribute("ContentType", IMAGE_CONTENT_TYPES[cleanExt]);
         this.contentTypesDoc.documentElement.appendChild(el);
         this._knownExtensions.add(cleanExt);
       }
