@@ -78,6 +78,49 @@
     await withStore("readwrite", (store) => store.delete(id));
   }
 
+  function bytesToBase64(bytes) {
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function base64ToBytes(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  /* Portable JSON export — no server, no commit: just a file the user can
+     hand to someone else (email, clé USB...) who imports it into their own
+     browser's library via importLibrary() below. */
+  async function exportLibrary() {
+    const all = await getAllIllustrations();
+    const payload = all.map((e) => ({
+      label: e.label,
+      text: e.text,
+      ext: e.ext,
+      bytesBase64: bytesToBase64(e.bytes),
+    }));
+    return JSON.stringify({ format: "pg-illustration-library", version: 1, entries: payload }, null, 2);
+  }
+
+  /* Reuses addIllustration()'s existing dedup (same label + byte size), so
+     importing a file twice — or one that overlaps with entries already
+     present — doesn't create duplicates. */
+  async function importLibrary(jsonText) {
+    const data = JSON.parse(jsonText);
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    let imported = 0;
+    for (const e of entries) {
+      const before = await getAllIllustrations();
+      await addIllustration({ label: e.label, text: e.text, ext: e.ext, bytes: base64ToBytes(e.bytesBase64) });
+      const after = await getAllIllustrations();
+      if (after.length > before.length) imported++;
+    }
+    return { total: entries.length, imported, skipped: entries.length - imported };
+  }
+
   function jaccard(setA, setB) {
     let inter = 0;
     for (const t of setA) if (setB.has(t)) inter++;
@@ -101,5 +144,13 @@
     return bestScore >= MATCH_THRESHOLD ? best : null;
   }
 
-  global.PG_ILLUSTRATIONS = { addIllustration, getAllIllustrations, deleteIllustration, findBestMatch, MATCH_THRESHOLD };
+  global.PG_ILLUSTRATIONS = {
+    addIllustration,
+    getAllIllustrations,
+    deleteIllustration,
+    findBestMatch,
+    exportLibrary,
+    importLibrary,
+    MATCH_THRESHOLD,
+  };
 })(window);

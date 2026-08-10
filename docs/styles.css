@@ -88,6 +88,32 @@ h1 {
   font-weight: 700;
 }
 
+.illustration-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.illustration-actions button,
+.illustration-import-label {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: #fff;
+  color: var(--blue);
+  border: 1px solid var(--blue-light);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.illustration-actions button:hover,
+.illustration-import-label:hover {
+  background: #EAF2F8;
+}
+
 .illustration-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
