@@ -232,5 +232,5 @@
     return { blob, model, groups };
   }
 
-  global.PG_BUILD = { generateDeck, assembleDeck, renderContentSlide, getImageDimensions };
+  global.PG_BUILD = { generateDeck, assembleDeck, renderContentSlide, getImageDimensions, pickLienSuggestions };
 })(window);

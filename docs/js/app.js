@@ -87,13 +87,16 @@
   const tabPptx = document.getElementById("tab-pptx");
   const tabPix = document.getElementById("tab-pix");
   const tabMerge = document.getElementById("tab-merge");
+  const tabMulti = document.getElementById("tab-multi");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
+  const modeMulti = document.getElementById("mode-multi");
   const tabs = [
     { key: "pptx", tab: tabPptx, panel: modePptx },
     { key: "pix", tab: tabPix, panel: modePix },
     { key: "merge", tab: tabMerge, panel: modeMerge },
+    { key: "multi", tab: tabMulti, panel: modeMulti },
   ];
 
   let mode = "pptx";
@@ -101,7 +104,8 @@
   function refreshGenerateEnabled() {
     if (mode === "pptx") generateBtn.disabled = !sourceFile;
     else if (mode === "pix") generateBtn.disabled = pixFiles.length === 0;
-    else generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
+    else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
+    else generateBtn.disabled = multiFiles.length < 2;
   }
 
   function setMode(next) {
@@ -119,6 +123,7 @@
   tabPptx.addEventListener("click", () => setMode("pptx"));
   tabPix.addEventListener("click", () => setMode("pix"));
   tabMerge.addEventListener("click", () => setMode("merge"));
+  tabMulti.addEventListener("click", () => setMode("multi"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
 
@@ -300,6 +305,53 @@
     );
   }
 
+  /* ---------- Mode 4: merge several old-charte PPTX into one deck ---------- */
+
+  const multiDropzone = document.getElementById("multi-dropzone");
+  const multiFileInput = document.getElementById("multi-file-input");
+  const multiFileListEl = document.getElementById("multi-file-list");
+  const multiSummaryEl = document.getElementById("multi-summary");
+
+  let multiFiles = [];
+
+  function setMultiFiles(files) {
+    multiFiles = Array.from(files || []).filter((f) => /\.pptx$/i.test(f.name));
+    multiFileListEl.textContent = multiFiles.length
+      ? multiFiles.map((f, i) => `Source ${i + 1} : ${f.name}`).join(" · ")
+      : "";
+    setStatus("");
+    multiSummaryEl.hidden = true;
+    refreshGenerateEnabled();
+  }
+
+  wireDropzone(multiDropzone, multiFileInput, setMultiFiles);
+
+  async function generateFromMulti() {
+    setStatus(`Lecture de ${multiFiles.length} source(s)…`);
+    const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
+
+    const { blob, sectionCount, droppedCount } = await window.PG_MULTI_BUILD.generateMultiDeck(
+      gabaritBuffer,
+      multiFiles,
+      { titre: titreInput.value, thematique: thematiqueInput.value }
+    );
+
+    multiSummaryEl.innerHTML =
+      `<strong>${sectionCount} section(s) retenue(s)</strong> à partir de ${multiFiles.length} source(s).` +
+      (droppedCount
+        ? `<p class="unmatched">${droppedCount} diapositive(s) écartée(s) car trop proches d'un contenu déjà retenu (source précédente prioritaire).</p>`
+        : "");
+    multiSummaryEl.hidden = false;
+
+    const outName = (titreInput.value.trim() || "fusion-pptx") + " - mis en forme.pptx";
+    triggerDownload(blob, outName);
+    setStatus(
+      `Livrable généré : ${outName}\n${sectionCount} section(s) retenue(s) à partir de ${multiFiles.length} source(s).` +
+        "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
+      "success"
+    );
+  }
+
   /* ---------- Shared generate button ---------- */
 
   generateBtn.addEventListener("click", async () => {
@@ -307,7 +359,8 @@
     try {
       if (mode === "pptx") await generateFromPptx();
       else if (mode === "pix") await generateFromPix();
-      else await generateFromMerge();
+      else if (mode === "merge") await generateFromMerge();
+      else await generateFromMulti();
     } catch (err) {
       console.error(err);
       setStatus(`Erreur : ${err.message}`, "error");
