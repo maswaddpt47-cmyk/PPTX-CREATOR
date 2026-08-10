@@ -385,6 +385,28 @@
   illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
   refreshIllustrationPanel();
 
+  const illustrationExportBtn = document.getElementById("illustration-export-btn");
+  const illustrationImportInput = document.getElementById("illustration-import-input");
+
+  illustrationExportBtn.addEventListener("click", async () => {
+    const json = await window.PG_ILLUSTRATIONS.exportLibrary();
+    triggerDownload(new Blob([json], { type: "application/json" }), "bibliotheque-illustrations.json");
+  });
+
+  illustrationImportInput.addEventListener("change", async () => {
+    const file = illustrationImportInput.files && illustrationImportInput.files[0];
+    illustrationImportInput.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { total, imported, skipped } = await window.PG_ILLUSTRATIONS.importLibrary(text);
+      await refreshIllustrationPanel();
+      setStatus(`Bibliothèque importée : ${imported}/${total} nouvelle(s) illustration(s) ajoutée(s)${skipped ? ` (${skipped} déjà présente(s))` : ""}.`, "success");
+    } catch (err) {
+      setStatus(`Erreur d'import : ${err.message}`, "error");
+    }
+  });
+
   /* ---------- Shared generate button ---------- */
 
   generateBtn.addEventListener("click", async () => {
