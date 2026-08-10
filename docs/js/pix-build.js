@@ -54,9 +54,11 @@
   }
 
   /* matchedThemeIds/unmatched come from pix-extract.js's extractPixModel().
-     ambianceFiles: array of File (images the user supplies for illustration);
-     assigned round-robin to matched themes in library order, falling back to
-     that theme's generic pictogram once the supplied images run out. */
+     Illustration priority per theme: an explicit ambiance image (round-robin
+     across matched themes) if the user supplied any; otherwise a real
+     illustration borrowed from the persistent library (illustration-library.js)
+     if a similar one has been learned from a past PPTX; otherwise that
+     theme's generic pictogram as a last resort. */
   async function buildPixModel(matchedThemeIds, unmatched, ambianceFiles, options) {
     // Canonical library order, not screenshot-upload order, for a stable read.
     const matchedThemes = THEMES.filter((t) => matchedThemeIds.includes(t.id));
@@ -68,16 +70,23 @@
       ambianceBytes.push({ bytes: new Uint8Array(buf), ext });
     }
 
-    const contentSlides = matchedThemes.map((theme, i) => {
-      const image = ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : pictoImage(theme.id);
-      return {
+    const contentSlides = [];
+    for (let i = 0; i < matchedThemes.length; i++) {
+      const theme = matchedThemes[i];
+      let image = ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : null;
+      if (!image && window.PG_ILLUSTRATIONS) {
+        const match = await window.PG_ILLUSTRATIONS.findBestMatch(`${theme.heading} ${theme.intro}`);
+        if (match) image = { bytes: match.bytes, ext: match.ext };
+      }
+      if (!image) image = pictoImage(theme.id);
+      contentSlides.push({
         title: theme.title,
         intro: theme.intro,
         items: theme.items.map(([heading, body]) => ({ heading, body })),
         image,
         table: null,
-      };
-    });
+      });
+    }
 
     return {
       title: { main: (options.titre || "").trim(), intro: "", tags: [] },

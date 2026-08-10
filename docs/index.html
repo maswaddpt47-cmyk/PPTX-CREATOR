@@ -16,6 +16,17 @@
     compris pour la lecture des captures ci-dessous).
   </p>
 
+  <details id="illustration-library-panel" class="illustration-panel">
+    <summary>Bibliothèque d'illustrations (<span id="illustration-count">0</span>)</summary>
+    <p class="hint">
+      Alimentée automatiquement à chaque PPTX traité (n'importe quel mode) :
+      chaque illustration présente dans un fichier source est conservée ici
+      et réutilisée plus tard pour illustrer une diapositive qui n'en a pas
+      — stockée uniquement dans ce navigateur, jamais envoyée nulle part.
+    </p>
+    <div id="illustration-grid" class="illustration-grid"></div>
+  </details>
+
   <div class="mode-tabs" role="tablist">
     <button id="tab-pptx" class="mode-tab active" role="tab" aria-selected="true" type="button">
       Adapter un PPTX existant
@@ -170,6 +181,7 @@
 <script src="js/ooxml.js"></script>
 <script src="js/gabarit.js"></script>
 <script src="js/source-extract.js"></script>
+<script src="js/illustration-library.js"></script>
 <script src="js/classifier.js"></script>
 <script src="js/build.js"></script>
 <script src="js/pix-themes.js"></script>

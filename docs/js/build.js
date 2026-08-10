@@ -109,6 +109,24 @@
     return { x: slot.x + (slot.cx - cx) / 2, y: slot.y + (slot.cy - cy) / 2, cx, cy };
   }
 
+  function slideText(slide) {
+    const parts = [slide.title, slide.intro];
+    for (const item of slide.items || []) parts.push(item.heading, item.body);
+    return parts.join(" ");
+  }
+
+  /* Slides with no image of their own (common in real decks — not every
+     slide has one) get a chance to borrow a similarity-matched illustration
+     from the persistent library (illustration-library.js) before falling
+     back to no illustration at all. A slide's own extracted image always
+     wins when it has one. */
+  async function pickImage(slide) {
+    if (slide.image) return slide.image;
+    if (!window.PG_ILLUSTRATIONS) return null;
+    const match = await window.PG_ILLUSTRATIONS.findBestMatch(slideText(slide));
+    return match ? { bytes: match.bytes, ext: match.ext } : null;
+  }
+
   async function renderContentSlide(deck, slide) {
     if (slide.table) {
       const clone = await deck.cloneSlide(7);
@@ -124,9 +142,10 @@
       return clone;
     }
 
+    const image = await pickImage(slide);
     const clone = await deck.cloneSlide(7);
     const doc = await deck.loadSlideDoc(clone.num);
-    const hasImage = !!slide.image;
+    const hasImage = !!image;
     const items = slide.items.length
       ? slide.items
       : [{ heading: "", body: G.alertText("contenu de cette diapositive") }];
@@ -140,9 +159,9 @@
     deck.saveSlideDoc(clone.num, doc);
 
     if (hasImage) {
-      const mediaPath = deck.importMedia(slide.image.bytes, slide.image.ext);
+      const mediaPath = deck.importMedia(image.bytes, image.ext);
       const rId = await deck.addSlideImageRel(clone.num, mediaPath);
-      const dims = getImageDimensions(slide.image.bytes, slide.image.ext);
+      const dims = getImageDimensions(image.bytes, image.ext);
       const rect = dims ? fitContain(imageSlot, dims.width, dims.height) : imageSlot;
       const doc2 = await deck.loadSlideDoc(clone.num);
       const spTree = firstTag(doc2, NS.p, "spTree");

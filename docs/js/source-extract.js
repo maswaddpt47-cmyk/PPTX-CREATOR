@@ -289,6 +289,15 @@
       if (!extracted) continue;
       const image = await resolveSlideImage(pkg, num, extracted.imageRid);
       const entry = { num, ...extracted, image };
+      if (image && window.PG_ILLUSTRATIONS) {
+        const text = [entry.title, entry.intro, ...entry.items.map((it) => `${it.heading} ${it.body}`)].join(" ");
+        await window.PG_ILLUSTRATIONS.addIllustration({
+          label: entry.title || `Illustration slide ${num}`,
+          text,
+          bytes: image.bytes,
+          ext: image.ext,
+        });
+      }
       if (i === contentNums.length - 1 && looksLikeClosing(entry.title)) {
         closing = entry;
       } else {

@@ -85,16 +85,26 @@
       ambianceBytes.push({ bytes: new Uint8Array(buf), ext });
     }
 
-    const pixEntries = matchedThemes.map((theme, i) => ({
-      programme: { heading: theme.heading, body: theme.programmeBody },
-      slide: {
-        title: theme.title,
-        intro: theme.intro,
-        items: theme.items.map(([heading, body]) => ({ heading, body })),
-        image: ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : pictoImage(theme.id),
-        table: null,
-      },
-    }));
+    const pixEntries = [];
+    for (let i = 0; i < matchedThemes.length; i++) {
+      const theme = matchedThemes[i];
+      let image = ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : null;
+      if (!image && window.PG_ILLUSTRATIONS) {
+        const match = await window.PG_ILLUSTRATIONS.findBestMatch(`${theme.heading} ${theme.intro}`);
+        if (match) image = { bytes: match.bytes, ext: match.ext };
+      }
+      if (!image) image = pictoImage(theme.id);
+      pixEntries.push({
+        programme: { heading: theme.heading, body: theme.programmeBody },
+        slide: {
+          title: theme.title,
+          intro: theme.intro,
+          items: theme.items.map(([heading, body]) => ({ heading, body })),
+          image,
+          table: null,
+        },
+      });
+    }
 
     // Drop old-deck slides that already cover a kept PIX theme — the PIX
     // version wins on overlap.

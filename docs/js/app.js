@@ -352,6 +352,39 @@
     );
   }
 
+  /* ---------- Illustration library panel ---------- */
+
+  const illustrationCountEl = document.getElementById("illustration-count");
+  const illustrationGridEl = document.getElementById("illustration-grid");
+  const illustrationPanel = document.getElementById("illustration-library-panel");
+
+  async function refreshIllustrationPanel() {
+    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
+    illustrationCountEl.textContent = all.length;
+    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
+    illustrationGridEl.innerHTML = "";
+    for (const entry of all) {
+      const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
+      const url = URL.createObjectURL(blob);
+      const item = document.createElement("div");
+      item.className = "illustration-item";
+      item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
+      item.querySelector(".illustration-label").textContent = entry.label;
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.textContent = "Supprimer";
+      delBtn.addEventListener("click", async () => {
+        await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+        refreshIllustrationPanel();
+      });
+      item.appendChild(delBtn);
+      illustrationGridEl.appendChild(item);
+    }
+  }
+
+  illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
+  refreshIllustrationPanel();
+
   /* ---------- Shared generate button ---------- */
 
   generateBtn.addEventListener("click", async () => {
@@ -361,6 +394,7 @@
       else if (mode === "pix") await generateFromPix();
       else if (mode === "merge") await generateFromMerge();
       else await generateFromMulti();
+      await refreshIllustrationPanel();
     } catch (err) {
       console.error(err);
       setStatus(`Erreur : ${err.message}`, "error");
