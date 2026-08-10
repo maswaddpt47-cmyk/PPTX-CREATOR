@@ -26,6 +26,9 @@
     <button id="tab-merge" class="mode-tab" role="tab" aria-selected="false" type="button">
       Enrichir un ancien PPTX avec PIX
     </button>
+    <button id="tab-multi" class="mode-tab" role="tab" aria-selected="false" type="button">
+      Fusionner plusieurs PPTX
+    </button>
   </div>
 
   <section id="mode-pptx" class="mode-panel">
@@ -114,6 +117,27 @@
     <div id="merge-summary" class="pix-summary" hidden></div>
   </section>
 
+  <section id="mode-multi" class="mode-panel" hidden>
+    <p class="lead">
+      Déposez plusieurs anciens PPTX (ancienne charte) : ils sont fusionnés
+      en un seul livrable au nouveau gabarit. Chaque source garde ses
+      propres sections, dans l'ordre de dépôt ; le contenu très proche
+      d'une source à l'autre n'est gardé qu'une seule fois (la première
+      source déposée est prioritaire en cas de recoupement).
+    </p>
+
+    <section id="multi-dropzone" class="dropzone" tabindex="0">
+      <div class="dropzone-inner">
+        <p class="dropzone-title">Glissez vos anciens PPTX ici (plusieurs fichiers, dans l'ordre voulu)</p>
+        <p class="dropzone-sub">ou cliquez pour sélectionner des fichiers</p>
+        <p id="multi-file-list" class="file-name"></p>
+      </div>
+      <input id="multi-file-input" type="file" accept=".pptx" multiple hidden />
+    </section>
+
+    <div id="multi-summary" class="pix-summary" hidden></div>
+  </section>
+
   <div class="field">
     <label for="titre">Titre de la présentation <span class="optional">— optionnel</span></label>
     <input id="titre" type="text" placeholder="ex. Bien débuter avec le numérique" />
@@ -153,6 +177,7 @@
 <script src="js/pix-extract.js"></script>
 <script src="js/pix-build.js"></script>
 <script src="js/merge-build.js"></script>
+<script src="js/multi-build.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
