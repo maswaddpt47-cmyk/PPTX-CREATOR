@@ -427,12 +427,22 @@
       y += h + 91440;
     }
 
+    // Real decks can carry more cartouches (or longer plain items pushing
+    // the starting y down) than this fixed-height layout was designed for.
+    // CONTENT_BOTTOM - colY[col] goes negative once a column's already-
+    // stacked content passes the bottom bound — confirmed in production: a
+    // <a:ext cy="-169878"/> is invalid OOXML that PowerPoint silently
+    // strips ("some content could not be read and was removed") rather
+    // than rendering. Floor it to a small positive height instead: the
+    // card still overflows visually in that rare case, but the file stays
+    // valid — a visible layout issue beats a corrupted deliverable.
+    const MIN_CARD_HEIGHT = 300000;
     const colWidth = twoCols ? (textZoneCx - COL_GAP) / 2 : textZoneCx;
     const colX = [CONTENT_X, CONTENT_X + colWidth + COL_GAP];
     const colY = [y, y];
     cardItems.forEach((it, idx) => {
       const col = twoCols ? idx % 2 : 0;
-      const h = Math.min(estimateCardHeight(it, colWidth, sizes), CONTENT_BOTTOM - colY[col]);
+      const h = Math.max(Math.min(estimateCardHeight(it, colWidth, sizes), CONTENT_BOTTOM - colY[col]), MIN_CARD_HEIGHT);
       spTree.appendChild(
         buildCard(doc, { x: colX[col], y: colY[col], cx: colWidth, cy: h, heading: it.heading, body: it.body, sizes })
       );
@@ -469,7 +479,7 @@
     const gf = doc.createElementNS(NS.p, "p:graphicFrame");
     const nv = doc.createElementNS(NS.p, "p:nvGraphicFramePr");
     const cNvPr = doc.createElementNS(NS.p, "p:cNvPr");
-    cNvPr.setAttribute("id", String(900000 + Math.floor(Math.random() * 90000)));
+    cNvPr.setAttribute("id", freshShapeId());
     cNvPr.setAttribute("name", "Tableau");
     nv.appendChild(cNvPr);
     const cNvGf = doc.createElementNS(NS.p, "p:cNvGraphicFramePr");
@@ -623,7 +633,9 @@
     const innerWidth = newWidth - 182880; // default 91440 lIns/rIns
     const boxTop = parseInt(firstTag(xfrm, NS.a, "off").getAttribute("y"), 10);
     const maxCy = 6858000 - boxTop; // never let the stored box claim past the slide edge
-    const computedCy = Math.min(recomputeTextBoxHeight(shape, innerWidth), maxCy);
+    // Same defensive floor as fillCardLayout's card heights: a non-positive
+    // cy is invalid OOXML PowerPoint will strip on open.
+    const computedCy = Math.max(Math.min(recomputeTextBoxHeight(shape, innerWidth), maxCy), 300000);
     firstTag(xfrm, NS.a, "ext").setAttribute("cy", String(computedCy));
   }
 
