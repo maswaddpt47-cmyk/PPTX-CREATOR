@@ -141,16 +141,28 @@ h1 {
   word-break: break-word;
 }
 
-.illustration-item button {
-  width: 100%;
-  border: none;
+.illustration-item-actions {
+  display: flex;
   border-top: 1px solid var(--border);
+}
+
+.illustration-item-actions button {
+  flex: 1;
+  border: none;
   background: none;
-  color: var(--red);
   cursor: pointer;
   padding: 0.3rem;
   font: inherit;
   font-size: 0.75rem;
+}
+
+.illustration-item-actions button:first-child {
+  border-right: 1px solid var(--border);
+  color: var(--blue);
+}
+
+.illustration-item-actions button:last-child {
+  color: var(--red);
 }
 
 .mode-tabs {
