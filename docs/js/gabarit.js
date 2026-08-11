@@ -208,7 +208,14 @@
     const charWidthIn = (pt / 72) * (bold ? 0.56 : 0.52);
     const lineHeightIn = (pt / 72) * 1.22;
     const charsPerLine = Math.max(1, Math.floor(widthIn / charWidthIn));
-    const numLines = Math.max(1, Math.ceil(text.length / charsPerLine));
+    // Body text often joins several source bullets with literal "\n"
+    // (rendered as forced line breaks, not wrappable characters) — counting
+    // the whole string as one flowing paragraph undercounts real height
+    // whenever it contains one of these. Each "\n"-separated segment wraps
+    // on its own.
+    const numLines = text
+      .split("\n")
+      .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
     return Math.round(numLines * lineHeightIn * 914400 * 1.15);
   }
 
@@ -287,6 +294,12 @@
     bodyPr.setAttribute("rIns", String(CARD_PAD_R));
     bodyPr.setAttribute("bIns", String(CARD_PAD_B));
     bodyPr.setAttribute("anchor", "ctr");
+    // Safety net for whatever estimateCardHeight() still gets wrong (or a
+    // card whose height got clamped to the space left in its column): let
+    // PowerPoint shrink the text to fit rather than spilling it outside the
+    // cartouche. Same technique the gabarit template itself already uses
+    // on the section-divider title.
+    bodyPr.appendChild(doc.createElementNS(NS.a, "a:normAutofit"));
     txBody.appendChild(bodyPr);
     txBody.appendChild(doc.createElementNS(NS.a, "a:lstStyle"));
     if (heading) {
@@ -342,6 +355,7 @@
     bodyPr.setAttribute("tIns", "0");
     bodyPr.setAttribute("rIns", "0");
     bodyPr.setAttribute("bIns", "0");
+    bodyPr.appendChild(doc.createElementNS(NS.a, "a:normAutofit"));
     txBody.appendChild(bodyPr);
     txBody.appendChild(doc.createElementNS(NS.a, "a:lstStyle"));
     txBody.appendChild(buildBulletParagraph(doc, text, { bold: false, size: fontPt, color: "1F1F1F", bullet: false }));
@@ -397,6 +411,30 @@
   const IMAGE_CX = 3600000,
     COL_GAP = 300000;
 
+  /* Progressively smaller font tiers, tried in order until the estimated
+     total card height (across however many columns) fits the space left
+     below the intro/plain items. A real deck's cards can carry far more
+     text than the old fixed "items.length >= 4 ? small : big" split
+     anticipated — confirmed in production (cards spilling past the bottom
+     of the slide) — so this tries harder before falling back to the
+     smallest tier and letting each card's own normAutofit take over. */
+  const CARD_SIZE_TIERS = [
+    { heading: 1500, body: 1300 },
+    { heading: 1400, body: 1200 },
+    { heading: 1300, body: 1100 },
+    { heading: 1200, body: 1000 },
+  ];
+
+  function pickCardSizes(cardItems, colWidth, availableHeight, twoCols) {
+    if (!cardItems.length) return CARD_SIZE_TIERS[0];
+    for (const sizes of CARD_SIZE_TIERS) {
+      const total = cardItems.reduce((sum, it) => sum + estimateCardHeight(it, colWidth, sizes) + 182880, 0);
+      const neededPerCol = twoCols ? total / 2 : total;
+      if (neededPerCol <= availableHeight) return sizes;
+    }
+    return CARD_SIZE_TIERS[CARD_SIZE_TIERS.length - 1];
+  }
+
   /* Title + intro + heading/body items rendered as bordered cards (plus an
      optional side illustration), replacing the gabarit's plain content
      placeholder — which this function deletes from the cloned slide7. */
@@ -411,7 +449,15 @@
     const cardItems = items.filter((it) => it.heading);
     const plainItems = items.filter((it) => !it.heading);
     const twoCols = !hasImage && cardItems.length >= 3;
-    const sizes = items.length >= 4 ? { heading: 1400, body: 1200 } : { heading: 1500, body: 1300 };
+    const colWidth = twoCols ? (textZoneCx - COL_GAP) / 2 : textZoneCx;
+
+    // Conservative provisional estimate (largest tier) of where the card
+    // column(s) will start, just to size-pick against — actual intro/plain
+    // items below are rendered with the size tier this settles on.
+    let provisionalY = CONTENT_Y;
+    if (intro) provisionalY += estimatePlainHeight(intro, textZoneCx, 1400) + 137160;
+    for (const it of plainItems) provisionalY += estimatePlainHeight(it.body, textZoneCx, 1300) + 91440;
+    const sizes = pickCardSizes(cardItems, colWidth, CONTENT_BOTTOM - provisionalY, twoCols);
 
     let y = CONTENT_Y;
     if (intro) {
@@ -437,7 +483,6 @@
     // card still overflows visually in that rare case, but the file stays
     // valid — a visible layout issue beats a corrupted deliverable.
     const MIN_CARD_HEIGHT = 300000;
-    const colWidth = twoCols ? (textZoneCx - COL_GAP) / 2 : textZoneCx;
     const colX = [CONTENT_X, CONTENT_X + colWidth + COL_GAP];
     const colY = [y, y];
     cardItems.forEach((it, idx) => {
