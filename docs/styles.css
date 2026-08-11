@@ -165,6 +165,62 @@ h1 {
   color: var(--red);
 }
 
+.cleanup-section {
+  margin-top: 1.25rem;
+}
+
+.cleanup-section h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.cleanup-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.cleanup-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.cleanup-group-header button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #fff;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+
+.cleanup-kept .illustration-item-actions button {
+  color: var(--blue);
+  font-weight: 700;
+  cursor: default;
+}
+
+.cleanup-pair {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.cleanup-pair-score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
 .mode-tabs {
   display: flex;
   gap: 0.5rem;

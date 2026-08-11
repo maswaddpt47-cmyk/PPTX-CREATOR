@@ -144,13 +144,82 @@
     return bestScore >= MATCH_THRESHOLD ? best : null;
   }
 
+  function bytesEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  // Well above MATCH_THRESHOLD (which only needs a "good enough" topical
+  // match to illustrate a slide) — this one is asking "are these two
+  // library entries essentially the same content," a much stronger claim.
+  const NEAR_DUPLICATE_THRESHOLD = 0.5;
+
+  /* Two-tier duplicate scan over the whole library:
+     - exactGroups: entries with byte-for-byte identical image data (bucketed
+       by length first, then compared directly — no hashing, so zero
+       collision risk on a library this size). Unambiguous: safe to
+       auto-suggest deleting all but one per group.
+     - nearPairs: entries whose stored text (title+intro+items, the same
+       field findBestMatch() compares) is highly similar by the existing
+       Jaccard measure, sorted by score descending. NOT auto-deletable —
+       two different slides can legitimately share most of their wording
+       (e.g. two "créer votre mot de passe" sections) while carrying
+       different, both-worth-keeping photos, so this tier is surfaced for
+       a human to review side by side, never removed automatically. */
+  async function findDuplicateGroups() {
+    const all = await getAllIllustrations();
+
+    const byLength = new Map();
+    for (const e of all) {
+      const list = byLength.get(e.bytes.length) || [];
+      list.push(e);
+      byLength.set(e.bytes.length, list);
+    }
+    const exactGroups = [];
+    for (const bucket of byLength.values()) {
+      if (bucket.length < 2) continue;
+      const used = new Set();
+      for (let i = 0; i < bucket.length; i++) {
+        if (used.has(i)) continue;
+        const group = [bucket[i]];
+        for (let j = i + 1; j < bucket.length; j++) {
+          if (!used.has(j) && bytesEqual(bucket[i].bytes, bucket[j].bytes)) {
+            group.push(bucket[j]);
+            used.add(j);
+          }
+        }
+        if (group.length > 1) {
+          group.sort((a, b) => a.addedAt - b.addedAt);
+          exactGroups.push(group);
+        }
+      }
+    }
+
+    const tokensById = new Map(all.map((e) => [e.id, new Set(tokenize(e.text))]));
+    const nearPairs = [];
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i],
+          b = all[j];
+        const score = jaccard(tokensById.get(a.id), tokensById.get(b.id));
+        if (score >= NEAR_DUPLICATE_THRESHOLD) nearPairs.push({ score, a, b });
+      }
+    }
+    nearPairs.sort((x, y) => y.score - x.score);
+
+    return { exactGroups, nearPairs, total: all.length };
+  }
+
   global.PG_ILLUSTRATIONS = {
     addIllustration,
     getAllIllustrations,
     deleteIllustration,
     findBestMatch,
+    findDuplicateGroups,
     exportLibrary,
     importLibrary,
     MATCH_THRESHOLD,
+    NEAR_DUPLICATE_THRESHOLD,
   };
 })(window);

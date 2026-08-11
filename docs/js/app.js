@@ -385,47 +385,157 @@
   const illustrationGridEl = document.getElementById("illustration-grid");
   const illustrationPanel = document.getElementById("illustration-library-panel");
 
+  /* Shared thumbnail card — used by the main grid and the cleanup review
+     views below, so a "Supprimer" action always looks and behaves the
+     same regardless of where it's clicked from. `buttons` is an array of
+     { label, onClick } rendered as the item's action row, in order. */
+  function buildIllustrationCard(entry, buttons) {
+    const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
+    const url = URL.createObjectURL(blob);
+    const item = document.createElement("div");
+    item.className = "illustration-item";
+    item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
+    item.querySelector(".illustration-label").textContent = entry.label;
+
+    const actions = document.createElement("div");
+    actions.className = "illustration-item-actions";
+    for (const { label, onClick } of buttons) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.addEventListener("click", onClick);
+      actions.appendChild(btn);
+    }
+    item.appendChild(actions);
+    return { item, blob };
+  }
+
   async function refreshIllustrationPanel() {
     const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
     illustrationCountEl.textContent = all.length;
     if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
     illustrationGridEl.innerHTML = "";
     for (const entry of all) {
-      const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
-      const url = URL.createObjectURL(blob);
-      const item = document.createElement("div");
-      item.className = "illustration-item";
-      item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
-      item.querySelector(".illustration-label").textContent = entry.label;
-
-      const actions = document.createElement("div");
-      actions.className = "illustration-item-actions";
-
-      const dlBtn = document.createElement("button");
-      dlBtn.type = "button";
-      dlBtn.textContent = "Télécharger";
-      dlBtn.addEventListener("click", () => {
-        const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
-        triggerDownload(blob, `${safeName}.${entry.ext}`);
-      });
-      actions.appendChild(dlBtn);
-
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.textContent = "Supprimer";
-      delBtn.addEventListener("click", async () => {
-        await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-        refreshIllustrationPanel();
-      });
-      actions.appendChild(delBtn);
-
-      item.appendChild(actions);
+      const { item, blob } = buildIllustrationCard(entry, [
+        {
+          label: "Télécharger",
+          onClick: () => {
+            const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+            triggerDownload(blob, `${safeName}.${entry.ext}`);
+          },
+        },
+        {
+          label: "Supprimer",
+          onClick: async () => {
+            await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+            refreshIllustrationPanel();
+          },
+        },
+      ]);
       illustrationGridEl.appendChild(item);
     }
   }
 
   illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
   refreshIllustrationPanel();
+
+  /* ---------- Illustration cleanup: exact + near-duplicate review ---------- */
+
+  const illustrationCleanupBtn = document.getElementById("illustration-cleanup-btn");
+  const illustrationCleanupResultsEl = document.getElementById("illustration-cleanup-results");
+
+  async function runIllustrationCleanupScan() {
+    illustrationCleanupResultsEl.innerHTML = "";
+    const { exactGroups, nearPairs, total } = await window.PG_ILLUSTRATIONS.findDuplicateGroups();
+
+    if (!total) {
+      illustrationCleanupResultsEl.innerHTML = `<p class="hint">Bibliothèque vide.</p>`;
+      return;
+    }
+    if (!exactGroups.length && !nearPairs.length) {
+      illustrationCleanupResultsEl.innerHTML = `<p class="hint">Aucun doublon détecté sur ${total} illustration(s).</p>`;
+      return;
+    }
+
+    if (exactGroups.length) {
+      const section = document.createElement("div");
+      section.className = "cleanup-section";
+      section.innerHTML = `<h3>Doublons exacts (image strictement identique)</h3>
+        <p class="hint">La plus ancienne de chaque groupe est conservée ; les autres peuvent être supprimées sans perte, ce sont les mêmes octets.</p>`;
+      for (const group of exactGroups) {
+        const [keep, ...rest] = group;
+        const groupEl = document.createElement("div");
+        groupEl.className = "cleanup-group";
+        const header = document.createElement("div");
+        header.className = "cleanup-group-header";
+        header.innerHTML = `<strong>${group.length} copies — "${keep.label}"</strong>`;
+        const bulkBtn = document.createElement("button");
+        bulkBtn.type = "button";
+        bulkBtn.textContent = `Supprimer les ${rest.length} doublon(s), garder le plus ancien`;
+        bulkBtn.addEventListener("click", async () => {
+          for (const e of rest) await window.PG_ILLUSTRATIONS.deleteIllustration(e.id);
+          await refreshIllustrationPanel();
+          await runIllustrationCleanupScan();
+        });
+        header.appendChild(bulkBtn);
+        groupEl.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "illustration-grid";
+        for (const entry of group) {
+          const isKept = entry === keep;
+          const { item } = buildIllustrationCard(entry, [
+            {
+              label: isKept ? "Conservée" : "Supprimer",
+              onClick: async () => {
+                if (isKept) return;
+                await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+                await refreshIllustrationPanel();
+                await runIllustrationCleanupScan();
+              },
+            },
+          ]);
+          if (isKept) item.classList.add("cleanup-kept");
+          grid.appendChild(item);
+        }
+        groupEl.appendChild(grid);
+        section.appendChild(groupEl);
+      }
+      illustrationCleanupResultsEl.appendChild(section);
+    }
+
+    if (nearPairs.length) {
+      const section = document.createElement("div");
+      section.className = "cleanup-section";
+      section.innerHTML = `<h3>Quasi-doublons à vérifier (contenu textuel très proche)</h3>
+        <p class="hint">Les images sont différentes mais le titre/contenu se ressemble beaucoup — à toi de juger si ce sont deux illustrations distinctes à garder, ou un doublon à nettoyer.</p>`;
+      for (const { score, a, b } of nearPairs) {
+        const pairEl = document.createElement("div");
+        pairEl.className = "cleanup-pair";
+        pairEl.innerHTML = `<div class="cleanup-pair-score">Similarité de contenu : ${Math.round(score * 100)}%</div>`;
+        const grid = document.createElement("div");
+        grid.className = "illustration-grid";
+        for (const entry of [a, b]) {
+          const { item } = buildIllustrationCard(entry, [
+            {
+              label: "Supprimer celle-ci",
+              onClick: async () => {
+                await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+                await refreshIllustrationPanel();
+                await runIllustrationCleanupScan();
+              },
+            },
+          ]);
+          grid.appendChild(item);
+        }
+        pairEl.appendChild(grid);
+        section.appendChild(pairEl);
+      }
+      illustrationCleanupResultsEl.appendChild(section);
+    }
+  }
+
+  illustrationCleanupBtn.addEventListener("click", runIllustrationCleanupScan);
 
   const illustrationExportBtn = document.getElementById("illustration-export-btn");
   const illustrationImportInput = document.getElementById("illustration-import-input");
