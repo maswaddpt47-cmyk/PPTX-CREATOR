@@ -292,6 +292,30 @@
     return CLOSING_KEYWORDS.some((k) => norm.includes(k));
   }
 
+  /* The gabarit's own final slide always carries the département's fixed
+     contact block (phone/email/site) — confirmed in production: a source
+     deck's own "Besoin d'aide ?" slide made up of just that same
+     phone/email/site duplicated it verbatim in a merged output. Detected
+     by the specific contact details rather than the generic "besoin
+     d'aide" phrasing, since a slide with a *different* helpline (e.g.
+     FranceConnect's own, seen in a real source) is legitimate content,
+     not a duplicate. Requiring at least 2 of the 3 avoids a false hit on
+     a substantial troubleshooting slide that merely lists the
+     conseiller numérique email as one line among others — confirmed in
+     production: an earlier version matching on just 1 signature dropped a
+     whole "mes identifiants ne fonctionnent pas" slide over that. */
+  const DEPT_CONTACT_SIGNATURES = [
+    "lotetgaronne.fr/inclusion-numerique",
+    "conseiller-numerique@lotetgaronne.fr",
+    "05 53 47 31 32",
+  ];
+
+  function looksLikeDeptContactDuplicate(text) {
+    const norm = text.toLowerCase();
+    const hits = DEPT_CONTACT_SIGNATURES.filter((sig) => norm.includes(sig)).length;
+    return hits >= 2;
+  }
+
   /* pkg: PptxPackage of the uploaded source deck. Returns:
      { title: {main, intro, tags}, programme: [{heading,body}],
        contentSlides: [{num,title,intro,items,table}], closing: {...}|null } */
@@ -335,6 +359,12 @@
       const shapes = readShapes(docs[num]);
       const extracted = extractSlideContent(shapes);
       if (!extracted) continue;
+      const entryText = [
+        extracted.title,
+        extracted.intro,
+        ...extracted.items.map((it) => `${it.heading} ${it.body}`),
+      ].join(" ");
+      if (looksLikeDeptContactDuplicate(entryText)) continue;
       const image = await resolveSlideImage(pkg, num, extracted.imageRid);
       const entry = { num, ...extracted, image };
       if (image && window.PG_ILLUSTRATIONS) {
