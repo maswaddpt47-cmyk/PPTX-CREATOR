@@ -229,7 +229,25 @@
     let imageRid = null;
     if (pics.length) {
       pics.sort((a, b) => b.pos.cx * b.pos.cy - a.pos.cx * a.pos.cy);
-      imageRid = pics[0].blipRid;
+      // A "cards with a background picture per item" layout (e.g. 4 cards,
+      // each backed by the same or a same-size decorative PNG reused as a
+      // tinted panel) produces several large pics above ILLUSTRATION_MIN
+      // that are NOT a genuine single hero illustration. Confirmed on a
+      // real deck: 3 of 4 "pictures" on one slide were literally the same
+      // rId reused as each card's backdrop. Only pick an image when either
+      // a single rId repeats (unambiguous decorative reuse — never a real
+      // illustration) is absent, and the top candidate clearly dominates
+      // the runner-up in area (a real hero photo isn't matched in size by
+      // a second large picture on the same slide).
+      const ridCounts = new Map();
+      for (const p of pics) ridCounts.set(p.blipRid, (ridCounts.get(p.blipRid) || 0) + 1);
+      const hasRepeatedRid = [...ridCounts.values()].some((n) => n > 1);
+      const top = pics[0];
+      const runnerUp = pics[1];
+      const topArea = top.pos.cx * top.pos.cy;
+      const runnerUpArea = runnerUp ? runnerUp.pos.cx * runnerUp.pos.cy : 0;
+      const topDominates = !runnerUp || runnerUpArea < topArea * 0.6;
+      if (!hasRepeatedRid && topDominates) imageRid = top.blipRid;
     }
 
     return { title, intro, items, table, imageRid };
