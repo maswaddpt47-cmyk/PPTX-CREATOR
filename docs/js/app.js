@@ -370,6 +370,19 @@
       item.className = "illustration-item";
       item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
       item.querySelector(".illustration-label").textContent = entry.label;
+
+      const actions = document.createElement("div");
+      actions.className = "illustration-item-actions";
+
+      const dlBtn = document.createElement("button");
+      dlBtn.type = "button";
+      dlBtn.textContent = "Télécharger";
+      dlBtn.addEventListener("click", () => {
+        const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+        triggerDownload(blob, `${safeName}.${entry.ext}`);
+      });
+      actions.appendChild(dlBtn);
+
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.textContent = "Supprimer";
@@ -377,7 +390,9 @@
         await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
         refreshIllustrationPanel();
       });
-      item.appendChild(delBtn);
+      actions.appendChild(delBtn);
+
+      item.appendChild(actions);
       illustrationGridEl.appendChild(item);
     }
   }
