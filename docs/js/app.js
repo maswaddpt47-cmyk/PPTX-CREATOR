@@ -246,7 +246,7 @@
   let mergePixFiles = [];
   let mergeAmbianceFiles = [];
 
-  mergeTargetMinutesEl.textContent = window.PG_MERGE_BUILD.TARGET_MINUTES;
+  mergeTargetMinutesEl.value = window.PG_MERGE_BUILD.DEFAULT_TARGET_MINUTES;
   mergeMinutesPerSlideEl.textContent = window.PG_MERGE_BUILD.MINUTES_PER_SLIDE;
 
   function setMergeSourceFile(files) {
@@ -284,12 +284,13 @@
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const sourceBuffer = await mergeSourceFile.arrayBuffer();
 
+    const targetMinutes = parseInt(mergeTargetMinutesEl.value, 10) || window.PG_MERGE_BUILD.DEFAULT_TARGET_MINUTES;
     const { blob, pixResult, keptCount } = await window.PG_MERGE_BUILD.generateMergedDeck(
       gabaritBuffer,
       sourceBuffer,
       mergePixFiles,
       mergeAmbianceFiles,
-      { titre: titreInput.value, thematique: thematiqueInput.value },
+      { titre: titreInput.value, thematique: thematiqueInput.value, targetMinutes },
       (i, total, filename) => setStatus(`Lecture de la capture ${i + 1}/${total} : ${filename}`)
     );
 
