@@ -26,18 +26,48 @@
       .filter((w) => w.length > 2 && !STOPWORDS.has(w));
   }
 
+  /* Truncates at the last word boundary at or before maxLen (never mid-word).
+     If the text has no space before maxLen, returns it whole rather than
+     chopping a single long word. */
+  function truncateAtWord(text, maxLen) {
+    const t = (text || "").trim();
+    if (t.length <= maxLen) return t;
+    const cut = t.slice(0, maxLen);
+    const lastSpace = cut.lastIndexOf(" ");
+    const safe = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
+    return safe.trim() + "…";
+  }
+
+  /* Locates the shape's own <a:xfrm> — scoped to its <p:spPr> (sp/pic) or
+     its direct <p:xfrm> (graphicFrame) — rather than a deep subtree search.
+     A deep search via getElementsByTagNameNS can match an unrelated <a:ext>
+     sitting inside <p:cNvPr><a:extLst> metadata (e.g. PowerPoint's
+     a16:creationId tracking element), which appears earlier in document
+     order than the real geometry and yields NaN position/size. */
+  function readXfrm(child, local) {
+    let xfrm = null;
+    if (local === "sp" || local === "pic") {
+      const spPr = firstTag(child, NS.p, "spPr");
+      if (spPr) xfrm = firstTag(spPr, NS.a, "xfrm");
+    } else if (local === "graphicFrame") {
+      xfrm = firstTag(child, NS.p, "xfrm");
+    }
+    return xfrm;
+  }
+
   function readShapes(slideDoc) {
     const spTree = firstTag(slideDoc, NS.p, "spTree");
     const shapes = [];
     for (const child of Array.from(spTree.children)) {
       const local = child.localName;
       if (local !== "sp" && local !== "pic" && local !== "graphicFrame") continue;
-      const xfrm = child.getElementsByTagNameNS(NS.a, "off")[0];
-      const ext = child.getElementsByTagNameNS(NS.a, "ext")[0];
-      const pos = xfrm
+      const xfrm = readXfrm(child, local);
+      const off = xfrm ? firstTag(xfrm, NS.a, "off") : null;
+      const ext = xfrm ? firstTag(xfrm, NS.a, "ext") : null;
+      const pos = off
         ? {
-            x: parseInt(xfrm.getAttribute("x"), 10),
-            y: parseInt(xfrm.getAttribute("y"), 10),
+            x: parseInt(off.getAttribute("x"), 10),
+            y: parseInt(off.getAttribute("y"), 10),
             cx: ext ? parseInt(ext.getAttribute("cx"), 10) : 0,
             cy: ext ? parseInt(ext.getAttribute("cy"), 10) : 0,
           }
@@ -275,7 +305,7 @@
       programmeShapes.filter((s) => s.text && !isNumericLabel(s.text)).slice(2)
     );
     const programme = programmeItems.map((it) => ({
-      heading: it.heading || it.body.slice(0, 40),
+      heading: it.heading || truncateAtWord(it.body, 60),
       body: it.body,
     }));
 
