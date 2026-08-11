@@ -98,12 +98,19 @@
       Repartez d'un ancien support (.pptx) et enrichissez-le avec des
       captures PIX. Les thèmes PIX sont toujours conservés en priorité ;
       s'il y a doublon avec une diapositive de l'ancien support sur le même
-      sujet, c'est la version PIX qui est gardée. La séance est calée sur
-      ~<span id="merge-target-minutes"></span> minutes,
-      à raison d'environ <span id="merge-minutes-per-slide"></span> minutes
-      par section — le contenu de l'ancien support est réduit en premier si
-      ça ne rentre pas.
+      sujet, c'est la version PIX qui est gardée. Le contenu de l'ancien
+      support est réduit en premier si la séance ne rentre pas dans la
+      durée cible ci-dessous.
     </p>
+
+    <div class="field">
+      <label for="merge-target-minutes">Durée cible de la séance (minutes)</label>
+      <input id="merge-target-minutes" type="number" min="3" step="1" value="60" />
+      <p class="hint">
+        À raison d'environ <span id="merge-minutes-per-slide"></span> minutes par
+        section, ça fixe le nombre maximum de sections retenues.
+      </p>
+    </div>
 
     <section id="merge-pptx-dropzone" class="dropzone" tabindex="0">
       <div class="dropzone-inner">

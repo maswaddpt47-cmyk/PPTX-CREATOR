@@ -22,9 +22,8 @@
   const { extractPixModel, matchTheme } = window.PG_PIX_EXTRACT;
   const PICTOS = window.PG_PICTOS;
 
-  const TARGET_MINUTES = 60;
-  const MINUTES_PER_SLIDE = 3;
-  const MAX_SLIDES = Math.floor(TARGET_MINUTES / MINUTES_PER_SLIDE);
+  const DEFAULT_TARGET_MINUTES = 60;
+  const MINUTES_PER_SLIDE = 3; // fixed pacing assumption, per the user's instruction
 
   function base64ToBytes(b64) {
     const binary = atob(b64);
@@ -45,7 +44,7 @@
     return parts.join(" ");
   }
 
-  function buildClosingSlide(matchedThemes, unmatched, keptCount) {
+  function buildClosingSlide(matchedThemes, unmatched, keptCount, targetMinutes) {
     const headings = matchedThemes.map((t) => t.heading).join(", ") || "les notions abordées";
     const items = [
       {
@@ -56,7 +55,7 @@
         heading: "Séance calibrée",
         body:
           `${keptCount} section(s) retenue(s), pour une séance d'environ ${keptCount * MINUTES_PER_SLIDE} minutes ` +
-          `(cible ${TARGET_MINUTES} min, ~${MINUTES_PER_SLIDE} min/section — les captures PIX sont toujours ` +
+          `(cible ${targetMinutes} min, ~${MINUTES_PER_SLIDE} min/section — les captures PIX sont toujours ` +
           `conservées en priorité, le contenu de l'ancien support est réduit en premier si besoin).`,
       },
     ];
@@ -70,6 +69,8 @@
   }
 
   async function buildMergedModel(oldModel, pixResult, ambianceFiles, options) {
+    const targetMinutes = options.targetMinutes > 0 ? options.targetMinutes : DEFAULT_TARGET_MINUTES;
+    const maxSlides = Math.max(1, Math.floor(targetMinutes / MINUTES_PER_SLIDE));
     const counts = {};
     for (const f of pixResult.perFile) if (f.theme) counts[f.theme] = (counts[f.theme] || 0) + 1;
     // Most-confirmed PIX theme first: both the natural priority order and,
@@ -120,18 +121,18 @@
       }));
 
     let combined = pixEntries.concat(oldEntries);
-    if (combined.length > MAX_SLIDES) combined = combined.slice(0, MAX_SLIDES);
+    if (combined.length > maxSlides) combined = combined.slice(0, maxSlides);
 
     return {
       title: { main: (options.titre || "").trim() || oldModel.title.main, intro: "", tags: [] },
       programme: combined.map((c) => c.programme),
       contentSlides: combined.map((c) => c.slide),
-      closing: buildClosingSlide(matchedThemes, pixResult.unmatched, combined.length),
+      closing: buildClosingSlide(matchedThemes, pixResult.unmatched, combined.length, targetMinutes),
     };
   }
 
   async function generateMergedDeck(gabaritBuffer, sourceBuffer, pixFiles, ambianceFiles, options, onProgress) {
-    options = Object.assign({ titre: "", thematique: "" }, options);
+    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
 
     const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
     const oldModel = await extractSourceModel(sourcePkg);
@@ -147,5 +148,5 @@
     return { blob, model, groups, pixResult, keptCount: model.contentSlides.length };
   }
 
-  global.PG_MERGE_BUILD = { generateMergedDeck, MAX_SLIDES, MINUTES_PER_SLIDE, TARGET_MINUTES };
+  global.PG_MERGE_BUILD = { generateMergedDeck, MINUTES_PER_SLIDE, DEFAULT_TARGET_MINUTES };
 })(window);
