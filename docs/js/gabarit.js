@@ -171,10 +171,20 @@
 
   /* bullet:false paragraphs (intros, standalone notes) must pin marL/indent
      to 0 — otherwise they inherit the layout's hanging-indent list style and
-     the first line sits left of the wrapped continuation lines. */
-  function buildBulletParagraph(doc, text, { bold = false, size = 1600, color = "1F1F1F", bullet = true } = {}) {
+     the first line sits left of the wrapped continuation lines. lnSpcPct
+     (OOXML spcPct units, 100000 = single spacing) tightens line spacing on
+     the densest cards — cheaper on legibility than shrinking the font
+     further once a slide is genuinely too full for the space available. */
+  function buildBulletParagraph(doc, text, { bold = false, size = 1600, color = "1F1F1F", bullet = true, lnSpcPct = 100000 } = {}) {
     const p = doc.createElementNS(NS.a, "a:p");
     const pPr = doc.createElementNS(NS.a, "a:pPr");
+    if (lnSpcPct !== 100000) {
+      const lnSpc = doc.createElementNS(NS.a, "a:lnSpc");
+      const spcPct = doc.createElementNS(NS.a, "a:spcPct");
+      spcPct.setAttribute("val", String(lnSpcPct));
+      lnSpc.appendChild(spcPct);
+      pPr.appendChild(lnSpc);
+    }
     if (bullet) {
       pPr.setAttribute("marL", "285750");
       pPr.setAttribute("indent", "-285750");
@@ -201,12 +211,12 @@
      clipped one. */
   /* fontSz is in OOXML hundredths-of-a-point (e.g. 1400 = 14pt), matching
      the `size` convention used everywhere else in this file. */
-  function estimateTextHeightEmu(text, widthEmu, fontSz, { bold = false } = {}) {
+  function estimateTextHeightEmu(text, widthEmu, fontSz, { bold = false, lnSpcPct = 100000 } = {}) {
     if (!text) return 0;
     const pt = fontSz / 100;
     const widthIn = widthEmu / 914400;
     const charWidthIn = (pt / 72) * (bold ? 0.56 : 0.52);
-    const lineHeightIn = (pt / 72) * 1.22;
+    const lineHeightIn = (pt / 72) * 1.22 * (lnSpcPct / 100000);
     const charsPerLine = Math.max(1, Math.floor(widthIn / charWidthIn));
     // Body text often joins several source bullets with literal "\n"
     // (rendered as forced line breaks, not wrappable characters) — counting
@@ -227,14 +237,17 @@
 
   function estimateCardHeight(item, cardWidth, sizes) {
     const innerWidth = cardWidth - CARD_PAD_L - CARD_PAD_R;
-    const hH = item.heading ? estimateTextHeightEmu(item.heading, innerWidth, sizes.heading, { bold: true }) : 0;
-    const bH = item.body ? estimateTextHeightEmu(item.body, innerWidth, sizes.body) : 0;
+    const lnSpcPct = sizes.lnSpcPct || 100000;
+    const hH = item.heading
+      ? estimateTextHeightEmu(item.heading, innerWidth, sizes.heading, { bold: true, lnSpcPct })
+      : 0;
+    const bH = item.body ? estimateTextHeightEmu(item.body, innerWidth, sizes.body, { lnSpcPct }) : 0;
     const gap = item.heading && item.body ? CARD_HEADING_BODY_GAP : 0;
     return CARD_PAD_T + CARD_PAD_B + hH + gap + bH;
   }
 
-  function estimatePlainHeight(text, width, fontPt) {
-    return estimateTextHeightEmu(text, width, fontPt);
+  function estimatePlainHeight(text, width, fontPt, lnSpcPct = 100000) {
+    return estimateTextHeightEmu(text, width, fontPt, { lnSpcPct });
   }
 
   let shapeIdCounter = 800000;
@@ -302,21 +315,22 @@
     bodyPr.appendChild(doc.createElementNS(NS.a, "a:normAutofit"));
     txBody.appendChild(bodyPr);
     txBody.appendChild(doc.createElementNS(NS.a, "a:lstStyle"));
+    const lnSpcPct = sizes.lnSpcPct || 100000;
     if (heading) {
       txBody.appendChild(
-        buildBulletParagraph(doc, heading, { bold: true, size: sizes.heading, color: "1F1F1F", bullet: false })
+        buildBulletParagraph(doc, heading, { bold: true, size: sizes.heading, color: "1F1F1F", bullet: false, lnSpcPct })
       );
     }
     if (body) {
       txBody.appendChild(
-        buildBulletParagraph(doc, body, { bold: false, size: sizes.body, color: "1F1F1F", bullet: false })
+        buildBulletParagraph(doc, body, { bold: false, size: sizes.body, color: "1F1F1F", bullet: false, lnSpcPct })
       );
     }
     sp.appendChild(txBody);
     return sp;
   }
 
-  function buildPlainTextBox(doc, { x, y, cx, cy, text, fontPt }) {
+  function buildPlainTextBox(doc, { x, y, cx, cy, text, fontPt, lnSpcPct = 100000 }) {
     const sp = doc.createElementNS(NS.p, "p:sp");
     const nvSpPr = doc.createElementNS(NS.p, "p:nvSpPr");
     const cNvPr = doc.createElementNS(NS.p, "p:cNvPr");
@@ -358,7 +372,9 @@
     bodyPr.appendChild(doc.createElementNS(NS.a, "a:normAutofit"));
     txBody.appendChild(bodyPr);
     txBody.appendChild(doc.createElementNS(NS.a, "a:lstStyle"));
-    txBody.appendChild(buildBulletParagraph(doc, text, { bold: false, size: fontPt, color: "1F1F1F", bullet: false }));
+    txBody.appendChild(
+      buildBulletParagraph(doc, text, { bold: false, size: fontPt, color: "1F1F1F", bullet: false, lnSpcPct })
+    );
     sp.appendChild(txBody);
     return sp;
   }
@@ -418,17 +434,25 @@
      anticipated — confirmed in production (cards spilling past the bottom
      of the slide) — so this tries harder before falling back to the
      smallest tier and letting each card's own normAutofit take over. */
+  /* Below the first two tiers, also tighten line spacing (spcPct) and the
+     gap left between cards — a real deck can pack more heading/body pairs
+     onto one slide than a comfortably-spaced layout has room for, and
+     shrinking the font alone hits diminishing returns fast. Confirmed in
+     production: a 5-card slide (plus 5 plain lines above it) still
+     overflowed at the old fixed {1200,1000} floor. */
   const CARD_SIZE_TIERS = [
-    { heading: 1500, body: 1300 },
-    { heading: 1400, body: 1200 },
-    { heading: 1300, body: 1100 },
-    { heading: 1200, body: 1000 },
+    { heading: 1500, body: 1300, lnSpcPct: 100000, gap: 182880 },
+    { heading: 1400, body: 1200, lnSpcPct: 100000, gap: 182880 },
+    { heading: 1300, body: 1100, lnSpcPct: 95000, gap: 137160 },
+    { heading: 1200, body: 1000, lnSpcPct: 92000, gap: 137160 },
+    { heading: 1100, body: 950, lnSpcPct: 88000, gap: 91440 },
+    { heading: 1000, body: 900, lnSpcPct: 85000, gap: 91440 },
   ];
 
   function pickCardSizes(cardItems, colWidth, availableHeight, twoCols) {
     if (!cardItems.length) return CARD_SIZE_TIERS[0];
     for (const sizes of CARD_SIZE_TIERS) {
-      const total = cardItems.reduce((sum, it) => sum + estimateCardHeight(it, colWidth, sizes) + 182880, 0);
+      const total = cardItems.reduce((sum, it) => sum + estimateCardHeight(it, colWidth, sizes) + sizes.gap, 0);
       const neededPerCol = twoCols ? total / 2 : total;
       if (neededPerCol <= availableHeight) return sizes;
     }
@@ -466,9 +490,17 @@
       y += h + 137160;
     }
     for (const it of plainItems) {
-      const h = estimatePlainHeight(it.body, textZoneCx, sizes.body);
+      const h = estimatePlainHeight(it.body, textZoneCx, sizes.body, sizes.lnSpcPct);
       spTree.appendChild(
-        buildPlainTextBox(doc, { x: CONTENT_X, y, cx: textZoneCx, cy: h, text: it.body, fontPt: sizes.body })
+        buildPlainTextBox(doc, {
+          x: CONTENT_X,
+          y,
+          cx: textZoneCx,
+          cy: h,
+          text: it.body,
+          fontPt: sizes.body,
+          lnSpcPct: sizes.lnSpcPct,
+        })
       );
       y += h + 91440;
     }
@@ -491,7 +523,7 @@
       spTree.appendChild(
         buildCard(doc, { x: colX[col], y: colY[col], cx: colWidth, cy: h, heading: it.heading, body: it.body, sizes })
       );
-      colY[col] += h + 182880;
+      colY[col] += h + sizes.gap;
     });
 
     return { imageSlot: hasImage ? { x: CONTENT_X + textZoneCx + COL_GAP, y: CONTENT_Y, cx: IMAGE_CX, cy: CONTENT_BOTTOM - CONTENT_Y } : null };
