@@ -10,6 +10,17 @@
   const { extractSourceModel, tokenize } = window.PG_SOURCE;
   const { classifyContentSlides } = window.PG_CLASSIFIER;
 
+  // Shared session-pacing assumption (per the user's own "3 min/section"
+  // instruction) and target-duration -> slide-cap conversion, reused by
+  // every mode's build module so "durée cible" behaves identically
+  // everywhere it appears.
+  const MINUTES_PER_SLIDE = 3;
+  const DEFAULT_TARGET_MINUTES = 60;
+  function computeMaxSlides(targetMinutes) {
+    const minutes = targetMinutes > 0 ? targetMinutes : DEFAULT_TARGET_MINUTES;
+    return Math.max(1, Math.floor(minutes / MINUTES_PER_SLIDE));
+  }
+
   const KNOWN_RESOURCES = [
     {
       title: "Cybermalveillance.gouv.fr — assistance et prévention numérique",
@@ -258,7 +269,7 @@
   }
 
   async function generateDeck(gabaritBuffer, sourceBuffer, options) {
-    options = Object.assign({ titre: "", thematique: "" }, options);
+    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
 
     const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
     const deck = new DeckBuilder(gabaritPkg);
@@ -267,10 +278,27 @@
     const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
     const model = await extractSourceModel(sourcePkg);
 
+    // Trim to the target session length, keeping the source's own slide
+    // order (earliest content first) — the closing/recap slide and the
+    // gabarit's fixed pages don't count against the budget, only the
+    // content slides being presented do.
+    const maxSlides = computeMaxSlides(options.targetMinutes);
+    const droppedCount = Math.max(0, model.contentSlides.length - maxSlides);
+    if (droppedCount) model.contentSlides = model.contentSlides.slice(0, maxSlides);
+
     const { groups } = await assembleDeck(deck, model, options);
     const blob = await deck.finalize();
-    return { blob, model, groups };
+    return { blob, model, groups, keptCount: model.contentSlides.length, droppedCount };
   }
 
-  global.PG_BUILD = { generateDeck, assembleDeck, renderContentSlide, getImageDimensions, pickLienSuggestions };
+  global.PG_BUILD = {
+    generateDeck,
+    assembleDeck,
+    renderContentSlide,
+    getImageDimensions,
+    pickLienSuggestions,
+    MINUTES_PER_SLIDE,
+    DEFAULT_TARGET_MINUTES,
+    computeMaxSlides,
+  };
 })(window);

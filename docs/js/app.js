@@ -130,8 +130,13 @@
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("file-input");
   const fileNameEl = document.getElementById("file-name");
+  const pptxTargetMinutesEl = document.getElementById("pptx-target-minutes");
+  const pptxMinutesPerSlideEl = document.getElementById("pptx-minutes-per-slide");
 
   let sourceFile = null;
+
+  pptxTargetMinutesEl.value = window.PG_BUILD.DEFAULT_TARGET_MINUTES;
+  pptxMinutesPerSlideEl.textContent = window.PG_BUILD.MINUTES_PER_SLIDE;
 
   function setFile(files) {
     const file = files && files[0];
@@ -151,16 +156,20 @@
   async function generateFromPptx() {
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const sourceBuffer = await sourceFile.arrayBuffer();
+    const targetMinutes = parseInt(pptxTargetMinutesEl.value, 10) || window.PG_BUILD.DEFAULT_TARGET_MINUTES;
 
-    const { blob } = await window.PG_BUILD.generateDeck(gabaritBuffer, sourceBuffer, {
+    const { blob, keptCount, droppedCount } = await window.PG_BUILD.generateDeck(gabaritBuffer, sourceBuffer, {
       titre: titreInput.value,
       thematique: thematiqueInput.value,
+      targetMinutes,
     });
 
     const outName = sourceFile.name.replace(/\.pptx$/i, "") + " - mis en forme.pptx";
     triggerDownload(blob, outName);
     setStatus(
-      `Livrable généré : ${outName}\nVérifiez les messages d'alerte rouge éventuels avant diffusion.`,
+      `Livrable généré : ${outName}\n${keptCount} section(s) retenue(s)` +
+        (droppedCount ? `, ${droppedCount} écartée(s) pour tenir dans la durée cible.` : ".") +
+        "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
       "success"
     );
   }
@@ -172,9 +181,14 @@
   const pixFileListEl = document.getElementById("pix-file-list");
   const ambianceInput = document.getElementById("ambiance-input");
   const pixSummaryEl = document.getElementById("pix-summary");
+  const pixTargetMinutesEl = document.getElementById("pix-target-minutes");
+  const pixMinutesPerSlideEl = document.getElementById("pix-minutes-per-slide");
 
   let pixFiles = [];
   let ambianceFiles = [];
+
+  pixTargetMinutesEl.value = window.PG_BUILD.DEFAULT_TARGET_MINUTES;
+  pixMinutesPerSlideEl.textContent = window.PG_BUILD.MINUTES_PER_SLIDE;
 
   function setPixFiles(files) {
     pixFiles = Array.from(files || []).filter((f) => /\.(png|jpe?g)$/i.test(f.name));
@@ -194,7 +208,7 @@
 
   async function generateFromPix() {
     setStatus("Lecture des captures (reconnaissance de texte hors-ligne)…");
-    const { matchedThemeIds, unmatched } = await window.PG_PIX_EXTRACT.extractPixModel(
+    const { matchedThemeIds, unmatched, perFile } = await window.PG_PIX_EXTRACT.extractPixModel(
       pixFiles,
       (i, total, filename) => setStatus(`Lecture de la capture ${i + 1}/${total} : ${filename}`)
     );
@@ -211,18 +225,21 @@
 
     setStatus("Génération du support en cours…");
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
-    const { blob } = await window.PG_PIX_BUILD.generatePixDeck(
+    const targetMinutes = parseInt(pixTargetMinutesEl.value, 10) || window.PG_BUILD.DEFAULT_TARGET_MINUTES;
+    const { blob, keptCount, droppedCount } = await window.PG_PIX_BUILD.generatePixDeck(
       gabaritBuffer,
       matchedThemeIds,
       unmatched,
+      perFile,
       ambianceFiles,
-      { titre: titreInput.value, thematique: thematiqueInput.value }
+      { titre: titreInput.value, thematique: thematiqueInput.value, targetMinutes }
     );
 
     const outName = (titreInput.value.trim() || "preparation-pix") + " - mis en forme.pptx";
     triggerDownload(blob, outName);
     setStatus(
-      `Livrable généré : ${outName}\n${matchedThemeIds.length} thème(s) inclus` +
+      `Livrable généré : ${outName}\n${keptCount} thème(s) inclus` +
+        (droppedCount ? `, ${droppedCount} thème(s) écarté(s) pour tenir dans la durée cible` : "") +
         (unmatched.length ? `, ${unmatched.length} capture(s) non reconnue(s) signalée(s) dans le récapitulatif.` : ".") +
         "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
       "success"
@@ -312,8 +329,13 @@
   const multiFileInput = document.getElementById("multi-file-input");
   const multiFileListEl = document.getElementById("multi-file-list");
   const multiSummaryEl = document.getElementById("multi-summary");
+  const multiTargetMinutesEl = document.getElementById("multi-target-minutes");
+  const multiMinutesPerSlideEl = document.getElementById("multi-minutes-per-slide");
 
   let multiFiles = [];
+
+  multiTargetMinutesEl.value = window.PG_BUILD.DEFAULT_TARGET_MINUTES;
+  multiMinutesPerSlideEl.textContent = window.PG_BUILD.MINUTES_PER_SLIDE;
 
   function setMultiFiles(files) {
     multiFiles = Array.from(files || []).filter((f) => /\.pptx$/i.test(f.name));
@@ -330,18 +352,22 @@
   async function generateFromMulti() {
     setStatus(`Lecture de ${multiFiles.length} source(s)…`);
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
+    const targetMinutes = parseInt(multiTargetMinutesEl.value, 10) || window.PG_BUILD.DEFAULT_TARGET_MINUTES;
 
-    const { blob, sectionCount, droppedCount } = await window.PG_MULTI_BUILD.generateMultiDeck(
+    const { blob, sectionCount, dedupDroppedCount, durationDroppedCount } = await window.PG_MULTI_BUILD.generateMultiDeck(
       gabaritBuffer,
       multiFiles,
-      { titre: titreInput.value, thematique: thematiqueInput.value }
+      { titre: titreInput.value, thematique: thematiqueInput.value, targetMinutes }
     );
 
-    multiSummaryEl.innerHTML =
-      `<strong>${sectionCount} section(s) retenue(s)</strong> à partir de ${multiFiles.length} source(s).` +
-      (droppedCount
-        ? `<p class="unmatched">${droppedCount} diapositive(s) écartée(s) car trop proches d'un contenu déjà retenu (source précédente prioritaire).</p>`
-        : "");
+    let summaryHtml = `<strong>${sectionCount} section(s) retenue(s)</strong> à partir de ${multiFiles.length} source(s).`;
+    if (dedupDroppedCount) {
+      summaryHtml += `<p class="unmatched">${dedupDroppedCount} diapositive(s) écartée(s) car trop proches d'un contenu déjà retenu (source précédente prioritaire).</p>`;
+    }
+    if (durationDroppedCount) {
+      summaryHtml += `<p class="unmatched">${durationDroppedCount} diapositive(s) supplémentaire(s) écartée(s) pour tenir dans la durée cible (sources les plus tardives réduites en premier).</p>`;
+    }
+    multiSummaryEl.innerHTML = summaryHtml;
     multiSummaryEl.hidden = false;
 
     const outName = (titreInput.value.trim() || "fusion-pptx") + " - mis en forme.pptx";

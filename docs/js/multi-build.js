@@ -25,7 +25,7 @@
   const G = window.PG_GABARIT;
   const { extractSourceModel, tokenize } = window.PG_SOURCE;
   const { classifyContentSlides } = window.PG_CLASSIFIER;
-  const { renderContentSlide, pickLienSuggestions } = window.PG_BUILD;
+  const { renderContentSlide, pickLienSuggestions, computeMaxSlides, DEFAULT_TARGET_MINUTES } = window.PG_BUILD;
 
   const SIMILARITY_THRESHOLD = 0.35;
 
@@ -66,7 +66,6 @@
     deck.saveSlideDoc(1, doc1);
 
     const isDuplicate = makeDedup();
-    const sommaireHeadings = [];
     const orderedRelIds = [
       deck.relIdForExistingSlide(1),
       deck.relIdForExistingSlide(2),
@@ -75,32 +74,49 @@
       deck.relIdForExistingSlide(5),
     ];
 
-    let droppedCount = 0;
+    let dedupDroppedCount = 0;
 
+    // Phase 1: classify each source against its own programme (independent
+    // passes — see the file header on why) and de-dup, but don't render yet.
+    // Flattening first is what lets the duration cap below trim across
+    // sources while still knowing, group by group, whether a divider is
+    // still needed once some of its slides get cut.
+    const flatEntries = []; // { heading, slide }[], one entry per surviving slide
+    const groupBoundaries = []; // index into flatEntries where each group starts
     for (const model of sourceModels) {
       const groups = classifyContentSlides(model.contentSlides, model.programme);
       for (let ci = 0; ci < groups.length; ci++) {
         const survivors = [];
         for (const slide of groups[ci]) {
-          if (isDuplicate(slide)) droppedCount++;
+          if (isDuplicate(slide)) dedupDroppedCount++;
           else survivors.push(slide);
         }
         if (!survivors.length) continue;
-
-        if (model.programme.length) {
-          sommaireHeadings.push(model.programme[ci].heading);
-          const divider = await deck.cloneSlide(6);
-          const divDoc = await deck.loadSlideDoc(divider.num);
-          G.setDividerTitle(divDoc, model.programme[ci].heading);
-          deck.saveSlideDoc(divider.num, divDoc);
-          orderedRelIds.push(divider.relId);
-        }
-
-        for (const slide of survivors) {
-          const rendered = await renderContentSlide(deck, slide);
-          orderedRelIds.push(rendered.relId);
-        }
+        if (model.programme.length) groupBoundaries.push(flatEntries.length);
+        for (const slide of survivors) flatEntries.push({ heading: model.programme[ci] && model.programme[ci].heading, slide });
       }
+    }
+
+    const maxSlides = computeMaxSlides(options.targetMinutes);
+    const durationDroppedCount = Math.max(0, flatEntries.length - maxSlides);
+    const kept = flatEntries.slice(0, maxSlides);
+    const keptBoundaries = new Set(groupBoundaries.filter((i) => i < kept.length));
+
+    // Phase 2: render the surviving, trimmed entries, emitting a divider
+    // only at each group's first surviving entry.
+    const sommaireHeadings = [];
+    for (let i = 0; i < kept.length; i++) {
+      const { heading, slide } = kept[i];
+      if (keptBoundaries.has(i)) {
+        sommaireHeadings.push(heading);
+        const divider = await deck.cloneSlide(6);
+        const divDoc = await deck.loadSlideDoc(divider.num);
+        G.setDividerTitle(divDoc, heading);
+        deck.saveSlideDoc(divider.num, divDoc);
+        orderedRelIds.push(divider.relId);
+      }
+      const rendered = await renderContentSlide(deck, slide);
+      orderedRelIds.push(rendered.relId);
     }
 
     const doc5 = await deck.loadSlideDoc(5);
@@ -132,11 +148,11 @@
     orderedRelIds.push(deck.relIdForExistingSlide(10));
 
     deck.setFinalOrder(orderedRelIds);
-    return { sommaireHeadings, droppedCount };
+    return { sommaireHeadings, dedupDroppedCount, durationDroppedCount };
   }
 
   async function generateMultiDeck(gabaritBuffer, sourceFiles, options) {
-    options = Object.assign({ titre: "", thematique: "" }, options);
+    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
 
     const sourceModels = [];
     for (const file of sourceFiles) {
@@ -149,10 +165,14 @@
     const deck = new DeckBuilder(gabaritPkg);
     await deck.init();
 
-    const { sommaireHeadings, droppedCount } = await assembleMultiDeck(deck, sourceModels, options);
+    const { sommaireHeadings, dedupDroppedCount, durationDroppedCount } = await assembleMultiDeck(
+      deck,
+      sourceModels,
+      options
+    );
     const blob = await deck.finalize();
 
-    return { blob, sectionCount: sommaireHeadings.length, droppedCount };
+    return { blob, sectionCount: sommaireHeadings.length, dedupDroppedCount, durationDroppedCount };
   }
 
   global.PG_MULTI_BUILD = { generateMultiDeck, SIMILARITY_THRESHOLD };

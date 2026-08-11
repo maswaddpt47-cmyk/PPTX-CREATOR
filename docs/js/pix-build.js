@@ -7,7 +7,7 @@
 
   const { PptxPackage, DeckBuilder } = window.PG_OOXML;
   const { THEMES } = window.PG_PIX_THEMES;
-  const { assembleDeck } = window.PG_BUILD;
+  const { assembleDeck, computeMaxSlides, DEFAULT_TARGET_MINUTES } = window.PG_BUILD;
   const PICTOS = window.PG_PICTOS;
 
   function base64ToBytes(b64) {
@@ -53,15 +53,25 @@
     };
   }
 
-  /* matchedThemeIds/unmatched come from pix-extract.js's extractPixModel().
-     Illustration priority per theme: an explicit ambiance image (round-robin
-     across matched themes) if the user supplied any; otherwise a real
-     illustration borrowed from the persistent library (illustration-library.js)
-     if a similar one has been learned from a past PPTX; otherwise that
-     theme's generic pictogram as a last resort. */
-  async function buildPixModel(matchedThemeIds, unmatched, ambianceFiles, options) {
-    // Canonical library order, not screenshot-upload order, for a stable read.
-    const matchedThemes = THEMES.filter((t) => matchedThemeIds.includes(t.id));
+  /* matchedThemeIds/unmatched/perFile come from pix-extract.js's
+     extractPixModel(). Illustration priority per theme: an explicit
+     ambiance image (round-robin across matched themes) if the user
+     supplied any; otherwise a real illustration borrowed from the
+     persistent library (illustration-library.js) if a similar one has
+     been learned from a past PPTX; otherwise that theme's generic
+     pictogram as a last resort. */
+  async function buildPixModel(matchedThemeIds, unmatched, perFile, ambianceFiles, options) {
+    const counts = {};
+    for (const f of perFile || []) if (f.theme) counts[f.theme] = (counts[f.theme] || 0) + 1;
+    // Most-confirmed theme first: both a sensible default read order and,
+    // when the target duration doesn't fit everything, the trim order —
+    // least-confirmed themes are dropped first.
+    const orderedThemes = THEMES.filter((t) => matchedThemeIds.includes(t.id)).sort(
+      (a, b) => (counts[b.id] || 0) - (counts[a.id] || 0)
+    );
+    const maxSlides = computeMaxSlides(options.targetMinutes);
+    const droppedCount = Math.max(0, orderedThemes.length - maxSlides);
+    const matchedThemes = orderedThemes.slice(0, maxSlides);
 
     const ambianceBytes = [];
     for (const file of ambianceFiles || []) {
@@ -88,25 +98,26 @@
       });
     }
 
-    return {
+    const model = {
       title: { main: (options.titre || "").trim(), intro: "", tags: [] },
       programme: matchedThemes.map((t) => ({ heading: t.heading, body: t.programmeBody })),
       contentSlides,
       closing: buildClosingSlide(matchedThemes, unmatched),
     };
+    return { model, droppedCount };
   }
 
-  async function generatePixDeck(gabaritBuffer, matchedThemeIds, unmatched, ambianceFiles, options) {
-    options = Object.assign({ titre: "", thematique: "" }, options);
+  async function generatePixDeck(gabaritBuffer, matchedThemeIds, unmatched, perFile, ambianceFiles, options) {
+    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
 
     const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
     const deck = new DeckBuilder(gabaritPkg);
     await deck.init();
 
-    const model = await buildPixModel(matchedThemeIds, unmatched, ambianceFiles, options);
+    const { model, droppedCount } = await buildPixModel(matchedThemeIds, unmatched, perFile, ambianceFiles, options);
     const { groups } = await assembleDeck(deck, model, options);
     const blob = await deck.finalize();
-    return { blob, model, groups };
+    return { blob, model, groups, keptCount: model.contentSlides.length, droppedCount };
   }
 
   global.PG_PIX_BUILD = { generatePixDeck };
