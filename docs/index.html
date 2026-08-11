@@ -62,6 +62,16 @@
       </div>
       <input id="file-input" type="file" accept=".pptx" hidden />
     </section>
+
+    <div class="field">
+      <label for="pptx-target-minutes">Durée cible de la séance (minutes)</label>
+      <input id="pptx-target-minutes" type="number" min="3" step="1" value="60" />
+      <p class="hint">
+        À raison d'environ <span id="pptx-minutes-per-slide"></span> minutes par
+        section, les dernières sections de la source sont réduites si ça ne
+        rentre pas.
+      </p>
+    </div>
   </section>
 
   <section id="mode-pix" class="mode-panel" hidden>
@@ -79,6 +89,16 @@
       </div>
       <input id="pix-file-input" type="file" accept=".png,.jpg,.jpeg" multiple hidden />
     </section>
+
+    <div class="field">
+      <label for="pix-target-minutes">Durée cible de la séance (minutes)</label>
+      <input id="pix-target-minutes" type="number" min="3" step="1" value="60" />
+      <p class="hint">
+        À raison d'environ <span id="pix-minutes-per-slide"></span> minutes par
+        thème, les thèmes les moins confirmés par vos captures sont réduits
+        en premier si ça ne rentre pas.
+      </p>
+    </div>
 
     <div class="field">
       <label for="ambiance-input">Images d'ambiance <span class="optional">— optionnel</span></label>
@@ -159,6 +179,16 @@
       </div>
       <input id="multi-file-input" type="file" accept=".pptx" multiple hidden />
     </section>
+
+    <div class="field">
+      <label for="multi-target-minutes">Durée cible de la séance (minutes)</label>
+      <input id="multi-target-minutes" type="number" min="3" step="1" value="60" />
+      <p class="hint">
+        À raison d'environ <span id="multi-minutes-per-slide"></span> minutes par
+        section, les dernières sections (des sources les plus tardives) sont
+        réduites en premier si ça ne rentre pas.
+      </p>
+    </div>
 
     <div id="multi-summary" class="pix-summary" hidden></div>
   </section>

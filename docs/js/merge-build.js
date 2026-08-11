@@ -18,12 +18,9 @@
   const { PptxPackage, DeckBuilder } = window.PG_OOXML;
   const { extractSourceModel } = window.PG_SOURCE;
   const { THEMES } = window.PG_PIX_THEMES;
-  const { assembleDeck } = window.PG_BUILD;
+  const { assembleDeck, computeMaxSlides, MINUTES_PER_SLIDE, DEFAULT_TARGET_MINUTES } = window.PG_BUILD;
   const { extractPixModel, matchTheme } = window.PG_PIX_EXTRACT;
   const PICTOS = window.PG_PICTOS;
-
-  const DEFAULT_TARGET_MINUTES = 60;
-  const MINUTES_PER_SLIDE = 3; // fixed pacing assumption, per the user's instruction
 
   function base64ToBytes(b64) {
     const binary = atob(b64);
@@ -70,7 +67,7 @@
 
   async function buildMergedModel(oldModel, pixResult, ambianceFiles, options) {
     const targetMinutes = options.targetMinutes > 0 ? options.targetMinutes : DEFAULT_TARGET_MINUTES;
-    const maxSlides = Math.max(1, Math.floor(targetMinutes / MINUTES_PER_SLIDE));
+    const maxSlides = computeMaxSlides(targetMinutes);
     const counts = {};
     for (const f of pixResult.perFile) if (f.theme) counts[f.theme] = (counts[f.theme] || 0) + 1;
     // Most-confirmed PIX theme first: both the natural priority order and,
