@@ -178,16 +178,19 @@
     const mediaPath = image ? deck.importMedia(image.bytes, image.ext) : null;
     const clone = await deck.cloneSlide(7);
     const doc = await deck.loadSlideDoc(clone.num);
-    const hasImage = !!mediaPath;
     const items = slide.items.length
       ? slide.items
       : [{ heading: "", body: G.alertText("contenu de cette diapositive") }];
-    const { imageSlot } = G.fillCardLayout(doc, {
+    // hasImage can come back false even when a mediaPath was resolved:
+    // fillCardLayout() drops the side illustration in favor of a fuller
+    // 2-column text layout when a dense card slide otherwise wouldn't fit
+    // any font/spacing tier in the narrower single-column-with-image zone.
+    const { imageSlot, hasImage } = G.fillCardLayout(doc, {
       title: slide.title,
       intro: slide.intro,
       items,
       missingTitle: !slide.title,
-      hasImage,
+      hasImage: !!mediaPath,
     });
     deck.saveSlideDoc(clone.num, doc);
 

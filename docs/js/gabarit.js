@@ -450,38 +450,58 @@
   ];
 
   function pickCardSizes(cardItems, colWidth, availableHeight, twoCols) {
-    if (!cardItems.length) return CARD_SIZE_TIERS[0];
+    if (!cardItems.length) return { sizes: CARD_SIZE_TIERS[0], fits: true };
     for (const sizes of CARD_SIZE_TIERS) {
       const total = cardItems.reduce((sum, it) => sum + estimateCardHeight(it, colWidth, sizes) + sizes.gap, 0);
       const neededPerCol = twoCols ? total / 2 : total;
-      if (neededPerCol <= availableHeight) return sizes;
+      if (neededPerCol <= availableHeight) return { sizes, fits: true };
     }
-    return CARD_SIZE_TIERS[CARD_SIZE_TIERS.length - 1];
+    return { sizes: CARD_SIZE_TIERS[CARD_SIZE_TIERS.length - 1], fits: false };
   }
 
   /* Title + intro + heading/body items rendered as bordered cards (plus an
      optional side illustration), replacing the gabarit's plain content
-     placeholder — which this function deletes from the cloned slide7. */
-  function fillCardLayout(doc, { title, intro, items, missingTitle, hasImage }) {
+     placeholder — which this function deletes from the cloned slide7.
+     Returns { imageSlot, hasImage }: hasImage can come back false even when
+     requested — see below. */
+  function fillCardLayout(doc, { title, intro, items, missingTitle, hasImage: wantImage }) {
     setTitle(doc, title, { missing: missingTitle, fieldLabel: "titre de la diapositive" });
 
     const placeholder = findShapeByPhIdx(doc, 1, { noType: true });
     if (placeholder) placeholder.parentNode.removeChild(placeholder);
 
     const spTree = firstTag(doc, NS.p, "spTree");
-    const textZoneCx = hasImage ? CONTENT_CX - IMAGE_CX - COL_GAP : CONTENT_CX;
     const cardItems = items.filter((it) => it.heading);
     const plainItems = items.filter((it) => !it.heading);
-    const twoCols = !hasImage && cardItems.length >= 3;
-    const colWidth = twoCols ? (textZoneCx - COL_GAP) / 2 : textZoneCx;
 
-    // Conservative provisional estimate (largest tier) of where the card
-    // column(s) will start, just to size-pick against — actual intro/plain
-    // items below are rendered with the size tier this settles on.
-    let provisionalY = CONTENT_Y;
-    if (intro) provisionalY += estimatePlainHeight(intro, textZoneCx, 1400) + 137160;
-    for (const it of plainItems) provisionalY += estimatePlainHeight(it.body, textZoneCx, 1300) + 91440;
-    const sizes = pickCardSizes(cardItems, colWidth, CONTENT_BOTTOM - provisionalY, twoCols);
+    // A side illustration forces a single text column, roughly doubling
+    // the vertical space each card needs versus a 2-column grid. Confirmed
+    // in production: a 6-card slide with an image genuinely didn't fit at
+    // any font/spacing tier in single column, while the same cards fit
+    // comfortably 2-up once the image was dropped. Try both layouts (when
+    // there are enough cards for 2 columns to matter) and only keep the
+    // image if its layout actually fits — legible content beats a
+    // decorative illustration.
+    let provisionalIntroY = CONTENT_Y;
+    if (intro) provisionalIntroY += estimatePlainHeight(intro, CONTENT_CX, 1400) + 137160;
+
+    function evaluate(useImage) {
+      const textZoneCx = useImage ? CONTENT_CX - IMAGE_CX - COL_GAP : CONTENT_CX;
+      const twoCols = !useImage && cardItems.length >= 3;
+      const colWidth = twoCols ? (textZoneCx - COL_GAP) / 2 : textZoneCx;
+      let provisionalY = provisionalIntroY;
+      for (const it of plainItems) provisionalY += estimatePlainHeight(it.body, textZoneCx, 1300) + 91440;
+      const { sizes, fits } = pickCardSizes(cardItems, colWidth, CONTENT_BOTTOM - provisionalY, twoCols);
+      return { useImage, textZoneCx, twoCols, colWidth, sizes, fits };
+    }
+
+    let layout = evaluate(wantImage);
+    if (wantImage && !layout.fits && cardItems.length >= 3) {
+      const withoutImage = evaluate(false);
+      if (withoutImage.fits) layout = withoutImage;
+    }
+    const { textZoneCx, twoCols, colWidth, sizes } = layout;
+    const hasImage = layout.useImage;
 
     let y = CONTENT_Y;
     if (intro) {
@@ -526,7 +546,12 @@
       colY[col] += h + sizes.gap;
     });
 
-    return { imageSlot: hasImage ? { x: CONTENT_X + textZoneCx + COL_GAP, y: CONTENT_Y, cx: IMAGE_CX, cy: CONTENT_BOTTOM - CONTENT_Y } : null };
+    return {
+      hasImage,
+      imageSlot: hasImage
+        ? { x: CONTENT_X + textZoneCx + COL_GAP, y: CONTENT_Y, cx: IMAGE_CX, cy: CONTENT_BOTTOM - CONTENT_Y }
+        : null,
+    };
   }
 
   /* Native <a:tbl> table, sized to roughly match the 1-col content zone,
