@@ -435,6 +435,28 @@
     triggerDownload(new Blob([json], { type: "application/json" }), "bibliotheque-illustrations.json");
   });
 
+  const illustrationZipBtn = document.getElementById("illustration-zip-btn");
+
+  illustrationZipBtn.addEventListener("click", async () => {
+    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
+    if (!all.length) {
+      setStatus("Bibliothèque vide — rien à télécharger.", "error");
+      return;
+    }
+    const zip = new JSZip();
+    const usedNames = new Set();
+    for (const entry of all) {
+      const base = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+      let name = `${base}.${entry.ext}`;
+      let n = 2;
+      while (usedNames.has(name)) name = `${base} (${n++}).${entry.ext}`;
+      usedNames.add(name);
+      zip.file(name, entry.bytes);
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    triggerDownload(blob, "bibliotheque-illustrations.zip");
+  });
+
   illustrationImportInput.addEventListener("change", async () => {
     const file = illustrationImportInput.files && illustrationImportInput.files[0];
     illustrationImportInput.value = "";
