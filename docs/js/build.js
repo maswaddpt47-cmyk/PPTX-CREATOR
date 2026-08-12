@@ -195,6 +195,10 @@
     // fillCardLayout() drops the side illustration in favor of a fuller
     // 2-column text layout when a dense card slide otherwise wouldn't fit
     // any font/spacing tier in the narrower single-column-with-image zone.
+    // imageSlot, on the other hand, comes back whenever the layout could
+    // reserve the space at all — even with no real image — so a slide with
+    // no automatic match still gets a visible "add your own picture here"
+    // placeholder instead of silently using the full text width.
     const { imageSlot, hasImage } = G.fillCardLayout(doc, {
       title: slide.title,
       intro: slide.intro,
@@ -211,6 +215,11 @@
       const doc2 = await deck.loadSlideDoc(clone.num);
       const spTree = firstTag(doc2, NS.p, "spTree");
       spTree.appendChild(G.buildPicture(doc2, { ...rect, rId }));
+      deck.saveSlideDoc(clone.num, doc2);
+    } else if (imageSlot) {
+      const doc2 = await deck.loadSlideDoc(clone.num);
+      const spTree = firstTag(doc2, NS.p, "spTree");
+      spTree.appendChild(G.buildImagePlaceholder(doc2, imageSlot));
       deck.saveSlideDoc(clone.num, doc2);
     }
 
