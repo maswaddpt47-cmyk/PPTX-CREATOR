@@ -88,15 +88,18 @@
   const tabPix = document.getElementById("tab-pix");
   const tabMerge = document.getElementById("tab-merge");
   const tabMulti = document.getElementById("tab-multi");
+  const tabScratch = document.getElementById("tab-scratch");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
   const modeMulti = document.getElementById("mode-multi");
+  const modeScratch = document.getElementById("mode-scratch");
   const tabs = [
     { key: "pptx", tab: tabPptx, panel: modePptx },
     { key: "pix", tab: tabPix, panel: modePix },
     { key: "merge", tab: tabMerge, panel: modeMerge },
     { key: "multi", tab: tabMulti, panel: modeMulti },
+    { key: "scratch", tab: tabScratch, panel: modeScratch },
   ];
 
   let mode = "pptx";
@@ -105,7 +108,8 @@
     if (mode === "pptx") generateBtn.disabled = !sourceFile;
     else if (mode === "pix") generateBtn.disabled = pixFiles.length === 0;
     else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
-    else generateBtn.disabled = multiFiles.length < 2;
+    else if (mode === "multi") generateBtn.disabled = multiFiles.length < 2;
+    else generateBtn.disabled = !scratchThemeInput.value.trim();
   }
 
   function setMode(next) {
@@ -124,6 +128,7 @@
   tabPix.addEventListener("click", () => setMode("pix"));
   tabMerge.addEventListener("click", () => setMode("merge"));
   tabMulti.addEventListener("click", () => setMode("multi"));
+  tabScratch.addEventListener("click", () => setMode("scratch"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
 
@@ -379,6 +384,62 @@
     );
   }
 
+  /* ---------- Mode 5: generate from a theme name alone (curated library, or Claude API as a fallback) ---------- */
+
+  const scratchThemeInput = document.getElementById("scratch-theme");
+  const scratchNotesInput = document.getElementById("scratch-notes");
+  const scratchTargetMinutesEl = document.getElementById("scratch-target-minutes");
+  const scratchMinutesPerSlideEl = document.getElementById("scratch-minutes-per-slide");
+  const scratchApiKeyInput = document.getElementById("scratch-api-key");
+  const scratchSummaryEl = document.getElementById("scratch-summary");
+
+  scratchTargetMinutesEl.value = window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
+  scratchMinutesPerSlideEl.textContent = window.PG_SCRATCH_BUILD.MINUTES_PER_SLIDE;
+  scratchApiKeyInput.value = window.PG_SCRATCH_BUILD.getStoredApiKey();
+
+  scratchThemeInput.addEventListener("input", () => {
+    setStatus("");
+    scratchSummaryEl.hidden = true;
+    refreshGenerateEnabled();
+  });
+
+  scratchApiKeyInput.addEventListener("change", () => {
+    window.PG_SCRATCH_BUILD.setStoredApiKey(scratchApiKeyInput.value.trim());
+  });
+
+  async function generateFromScratch() {
+    const theme = scratchThemeInput.value.trim();
+    setStatus(`Recherche du thème "${theme}" dans la bibliothèque hors-ligne…`);
+    const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
+    const targetMinutes = parseInt(scratchTargetMinutesEl.value, 10) || window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
+
+    const { blob, source, themeHeading, slideCount } = await window.PG_SCRATCH_BUILD.generateScratchDeck(gabaritBuffer, {
+      theme,
+      notes: scratchNotesInput.value,
+      titre: titreInput.value,
+      thematique: thematiqueInput.value,
+      targetMinutes,
+      apiKey: scratchApiKeyInput.value.trim(),
+    });
+
+    scratchSummaryEl.innerHTML =
+      source === "curated"
+        ? `<strong>Contenu trouvé dans la bibliothèque hors-ligne</strong> (thème « ${themeHeading} ») — aucun appel réseau.`
+        : `<strong>Contenu généré par l'API Claude</strong> (${slideCount} diapositive(s) de contenu) — aucun thème correspondant n'a été trouvé dans la bibliothèque hors-ligne.`;
+    scratchSummaryEl.hidden = false;
+
+    const outName = (titreInput.value.trim() || theme || "atelier") + " - mis en forme.pptx";
+    triggerDownload(blob, outName);
+    setStatus(
+      `Livrable généré : ${outName}\n` +
+        (source === "curated"
+          ? `Contenu issu de la bibliothèque hors-ligne (thème « ${themeHeading} »).`
+          : `Contenu généré par l'API Claude (${slideCount} diapositive(s) de contenu).`) +
+        "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
+      "success"
+    );
+  }
+
   /* ---------- Illustration library panel ---------- */
 
   const illustrationCountEl = document.getElementById("illustration-count");
@@ -589,7 +650,8 @@
       if (mode === "pptx") await generateFromPptx();
       else if (mode === "pix") await generateFromPix();
       else if (mode === "merge") await generateFromMerge();
-      else await generateFromMulti();
+      else if (mode === "multi") await generateFromMulti();
+      else await generateFromScratch();
       await refreshIllustrationPanel();
     } catch (err) {
       console.error(err);

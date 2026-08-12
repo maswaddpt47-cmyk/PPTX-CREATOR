@@ -289,7 +289,9 @@ h1 {
 }
 
 .field input[type="text"],
-.field input[type="number"] {
+.field input[type="number"],
+.field input[type="password"],
+.field textarea {
   width: 100%;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
@@ -297,8 +299,14 @@ h1 {
   font: inherit;
 }
 
+.field textarea {
+  resize: vertical;
+}
+
 .field input[type="text"]:focus,
-.field input[type="number"]:focus {
+.field input[type="number"]:focus,
+.field input[type="password"]:focus,
+.field textarea:focus {
   outline: 2px solid var(--blue-light);
   border-color: var(--blue-light);
 }

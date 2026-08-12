@@ -50,6 +50,9 @@
     <button id="tab-multi" class="mode-tab" role="tab" aria-selected="false" type="button">
       Fusionner plusieurs PPTX
     </button>
+    <button id="tab-scratch" class="mode-tab" role="tab" aria-selected="false" type="button">
+      Créer depuis un thème
+    </button>
   </div>
 
   <section id="mode-pptx" class="mode-panel">
@@ -196,6 +199,50 @@
     <div id="multi-summary" class="pix-summary" hidden></div>
   </section>
 
+  <section id="mode-scratch" class="mode-panel" hidden>
+    <p class="lead">
+      Pas de PPTX de départ : donnez juste le thème de l'atelier. Le thème est
+      d'abord recherché dans la bibliothèque de contenus pédagogiques déjà
+      rédigés (hors-ligne) ; s'il n'y est pas encore, le contenu est généré
+      par l'API Claude à partir de votre clé — la seule étape de toute
+      l'application où des données quittent votre navigateur.
+    </p>
+
+    <div class="field">
+      <label for="scratch-theme">Thème de l'atelier</label>
+      <input id="scratch-theme" type="text" placeholder="ex. Créer une adresse email" />
+    </div>
+
+    <div class="field">
+      <label for="scratch-notes">Observations <span class="optional">— optionnel</span></label>
+      <textarea id="scratch-notes" rows="3" placeholder="ex. public débutant, insister sur la sécurité, éviter le vocabulaire anglais…"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="scratch-target-minutes">Durée cible de la séance (minutes)</label>
+      <input id="scratch-target-minutes" type="number" min="3" step="1" value="60" />
+      <p class="hint">
+        À raison d'environ <span id="scratch-minutes-per-slide"></span> minutes
+        par diapositive de contenu, ça fixe le nombre de diapositives
+        demandées.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="scratch-api-key">Clé API Claude <span class="optional">— seulement si le thème n'est pas déjà dans la bibliothèque</span></label>
+      <input id="scratch-api-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
+      <p class="hint">
+        Stockée uniquement dans ce navigateur (jamais envoyée ailleurs qu'à
+        l'API Anthropic au moment de générer). Nécessaire seulement si le
+        thème demandé ne correspond à aucun contenu déjà rédigé dans la
+        bibliothèque hors-ligne — dans ce cas, le support est généré sans
+        appel réseau et cette clé n'est pas utilisée.
+      </p>
+    </div>
+
+    <div id="scratch-summary" class="pix-summary" hidden></div>
+  </section>
+
   <div class="field">
     <label for="titre">Titre de la présentation <span class="optional">— optionnel</span></label>
     <input id="titre" type="text" placeholder="ex. Bien débuter avec le numérique" />
@@ -237,6 +284,7 @@
 <script src="js/pix-build.js"></script>
 <script src="js/merge-build.js"></script>
 <script src="js/multi-build.js"></script>
+<script src="js/scratch-build.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
