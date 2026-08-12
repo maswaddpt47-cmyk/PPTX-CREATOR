@@ -389,6 +389,45 @@ button#generate-btn:not(:disabled):hover {
   font-weight: 700;
 }
 
+/* A little sign of life while a generation is running — overrides the
+   plain grey :disabled look (which reads as "form incomplete", not
+   "working") with the button's normal blue plus a spinning ring, so it's
+   visually obvious something is actively happening during a long API
+   call rather than looking stuck. */
+button#generate-btn.generating {
+  background: var(--blue);
+  color: #fff;
+  cursor: wait;
+  position: relative;
+  padding-left: 2.75rem;
+}
+
+button#generate-btn.generating::before {
+  content: "";
+  position: absolute;
+  left: 1.1rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pg-spin 0.8s linear infinite;
+}
+
+@keyframes pg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button#generate-btn.generating::before {
+    animation: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14181c;
