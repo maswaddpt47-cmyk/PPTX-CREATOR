@@ -420,6 +420,79 @@
     return pic;
   }
 
+  /* Dashed, unfilled placeholder drawn in the illustration slot when the
+     layout reserved room for an image but no automatic match (library or
+     ambiance) was found for this slide — confirmed as a real-world need
+     from production: a deck with no library coverage at all rendered with
+     zero indication of where a presenter could manually drop a picture in
+     PowerPoint afterwards. Deliberately subtle (dashed outline, muted
+     label, no fill) so it reads as an intentional "add your own image
+     here" spot rather than a broken/empty box. */
+  function buildImagePlaceholder(doc, { x, y, cx, cy }) {
+    const sp = doc.createElementNS(NS.p, "p:sp");
+    const nvSpPr = doc.createElementNS(NS.p, "p:nvSpPr");
+    const cNvPr = doc.createElementNS(NS.p, "p:cNvPr");
+    cNvPr.setAttribute("id", freshShapeId());
+    cNvPr.setAttribute("name", "Emplacement illustration");
+    nvSpPr.appendChild(cNvPr);
+    nvSpPr.appendChild(doc.createElementNS(NS.p, "p:cNvSpPr"));
+    nvSpPr.appendChild(doc.createElementNS(NS.p, "p:nvPr"));
+    sp.appendChild(nvSpPr);
+
+    const spPr = doc.createElementNS(NS.p, "p:spPr");
+    const xfrm = doc.createElementNS(NS.a, "a:xfrm");
+    const off = doc.createElementNS(NS.a, "a:off");
+    off.setAttribute("x", String(Math.round(x)));
+    off.setAttribute("y", String(Math.round(y)));
+    const ext = doc.createElementNS(NS.a, "a:ext");
+    ext.setAttribute("cx", String(Math.round(cx)));
+    ext.setAttribute("cy", String(Math.round(cy)));
+    xfrm.appendChild(off);
+    xfrm.appendChild(ext);
+    spPr.appendChild(xfrm);
+    const prstGeom = doc.createElementNS(NS.a, "a:prstGeom");
+    prstGeom.setAttribute("prst", "roundRect");
+    const avLst = doc.createElementNS(NS.a, "a:avLst");
+    const gd = doc.createElementNS(NS.a, "a:gd");
+    gd.setAttribute("name", "adj");
+    gd.setAttribute("fmla", "val 4000");
+    avLst.appendChild(gd);
+    prstGeom.appendChild(avLst);
+    spPr.appendChild(prstGeom);
+    spPr.appendChild(doc.createElementNS(NS.a, "a:noFill"));
+    const ln = doc.createElementNS(NS.a, "a:ln");
+    ln.setAttribute("w", "12700");
+    const lnFill = doc.createElementNS(NS.a, "a:solidFill");
+    const lnClr = doc.createElementNS(NS.a, "a:srgbClr");
+    lnClr.setAttribute("val", "B7C2CB");
+    lnFill.appendChild(lnClr);
+    ln.appendChild(lnFill);
+    const dash = doc.createElementNS(NS.a, "a:prstDash");
+    dash.setAttribute("val", "dash");
+    ln.appendChild(dash);
+    spPr.appendChild(ln);
+    sp.appendChild(spPr);
+
+    const txBody = doc.createElementNS(NS.p, "p:txBody");
+    const bodyPr = doc.createElementNS(NS.a, "a:bodyPr");
+    bodyPr.setAttribute("anchor", "ctr");
+    bodyPr.setAttribute("wrap", "square");
+    bodyPr.setAttribute("lIns", "91440");
+    bodyPr.setAttribute("rIns", "91440");
+    txBody.appendChild(bodyPr);
+    txBody.appendChild(doc.createElementNS(NS.a, "a:lstStyle"));
+    const p = buildBulletParagraph(doc, "Illustration à ajouter", {
+      bold: false,
+      size: 1100,
+      color: "8A97A0",
+      bullet: false,
+    });
+    firstTag(p, NS.a, "pPr").setAttribute("algn", "ctr");
+    txBody.appendChild(p);
+    sp.appendChild(txBody);
+    return sp;
+  }
+
   const CONTENT_X = 685800,
     CONTENT_Y = 1650000,
     CONTENT_CX = 10820400,
@@ -462,9 +535,13 @@
   /* Title + intro + heading/body items rendered as bordered cards (plus an
      optional side illustration), replacing the gabarit's plain content
      placeholder — which this function deletes from the cloned slide7.
-     Returns { imageSlot, hasImage }: hasImage can come back false even when
-     requested — see below. */
-  function fillCardLayout(doc, { title, intro, items, missingTitle, hasImage: wantImage }) {
+     `hasImage` here means "a real image is available to place" — the slot
+     itself is attempted regardless (see below), so a presenter always has
+     a predictable spot to drop in their own picture later even when no
+     automatic match was found.
+     Returns { imageSlot, hasImage }: both can come back false/null even
+     when a real image was passed in — see below. */
+  function fillCardLayout(doc, { title, intro, items, missingTitle, hasImage: hasRealImage }) {
     setTitle(doc, title, { missing: missingTitle, fieldLabel: "titre de la diapositive" });
 
     const placeholder = findShapeByPhIdx(doc, 1, { noType: true });
@@ -495,13 +572,28 @@
       return { useImage, textZoneCx, twoCols, colWidth, sizes, fits };
     }
 
-    let layout = evaluate(wantImage);
-    if (wantImage && !layout.fits && cardItems.length >= 3) {
+    // Reserve the illustration slot whenever the layout can fit it — even
+    // with no real image yet — so there's always a predictable manual
+    // insertion point. Confirmed missing in production: a deck with zero
+    // library/ambiance matches rendered every card slide full-width, with
+    // literally nowhere set aside for the presenter to add a picture
+    // afterwards. Scoped to slides that actually have cards: pickCardSizes()
+    // has no "does this overflow" check at all when there are zero cards
+    // (its early return just assumes plain text fits), so attempting the
+    // narrower with-image column on a plain-text-only slide with no real
+    // image would risk pushing text past the bottom with no safety net —
+    // unlike the card case just below, which always re-checks fit. A
+    // plain-only slide with an actual real image is unaffected: that already
+    // requested the slot before this change.
+    const attemptSlot = cardItems.length > 0 || hasRealImage;
+    let layout = evaluate(attemptSlot);
+    if (attemptSlot && !layout.fits && cardItems.length >= 3) {
       const withoutImage = evaluate(false);
       if (withoutImage.fits) layout = withoutImage;
     }
     const { textZoneCx, twoCols, colWidth, sizes } = layout;
-    const hasImage = layout.useImage;
+    const reserved = layout.useImage;
+    const hasImage = reserved && !!hasRealImage;
 
     let y = CONTENT_Y;
     if (intro) {
@@ -548,7 +640,7 @@
 
     return {
       hasImage,
-      imageSlot: hasImage
+      imageSlot: reserved
         ? { x: CONTENT_X + textZoneCx + COL_GAP, y: CONTENT_Y, cx: IMAGE_CX, cy: CONTENT_BOTTOM - CONTENT_Y }
         : null,
     };
@@ -786,6 +878,7 @@
     setDividerTitle,
     fillCardLayout,
     buildPicture,
+    buildImagePlaceholder,
     insertTable,
     setLiensSuggestions,
     CONTENT_X,
