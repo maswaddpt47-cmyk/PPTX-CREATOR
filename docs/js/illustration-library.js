@@ -128,13 +128,23 @@
     return union > 0 ? inter / union : 0;
   }
 
-  async function findBestMatch(queryText) {
+  /* excludeIds: entries already picked for an earlier slide in the same
+     deck are skipped, so a topic family with several closely-related
+     slides (e.g. "Santé en ligne" + its "Mon Espace Santé"/"Doctolib"
+     companions) doesn't reuse the exact same illustration on multiple
+     slides just because the library's best match for each of them
+     independently happens to be the same under-covered entry — confirmed
+     in production: two slides in one deck both got the identical image.
+     Falls through to the next-best entry above the threshold, or no
+     illustration at all rather than a visible repeat. */
+  async function findBestMatch(queryText, excludeIds) {
     const all = await getAllIllustrations();
     if (!all.length) return null;
     const queryTokens = new Set(tokenize(queryText));
     let best = null;
     let bestScore = 0;
     for (const entry of all) {
+      if (excludeIds && excludeIds.has(entry.id)) continue;
       const score = jaccard(queryTokens, new Set(tokenize(entry.text)));
       if (score > bestScore) {
         bestScore = score;

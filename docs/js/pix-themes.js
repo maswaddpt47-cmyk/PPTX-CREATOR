@@ -135,15 +135,23 @@
       items: [
         [
           "Qu'est-ce que c'est ?",
-          "Un espace personnel et sécurisé qui regroupe vos documents médicaux : résultats d'analyses, ordonnances, comptes rendus. Il ne sert pas à suivre vos remboursements (c'est le rôle d'Ameli.fr).",
+          "Un espace personnel et sécurisé qui regroupe vos documents médicaux : résultats d'analyses, ordonnances, comptes rendus, vaccinations, allergies, traitements en cours. Il ne sert pas à suivre vos remboursements (c'est le rôle d'Ameli.fr).",
+        ],
+        [
+          "Comment s'y connecter",
+          "Rendez-vous sur monespacesante.fr ou l'appli mobile, puis identifiez-vous avec FranceConnect (vos identifiants Ameli, impots.gouv...) ou avec l'identifiant reçu par courrier lors de l'ouverture de votre compte.",
         ],
         [
           "La messagerie sécurisée",
-          "Vous pouvez échanger des documents et des messages avec vos professionnels de santé (médecin, pharmacien...) directement depuis votre espace, en toute confidentialité.",
+          "Vous pouvez échanger des documents et des messages avec vos professionnels de santé (médecin, pharmacien...) directement depuis votre espace, en toute confidentialité — comme une boîte mail dédiée à votre suivi médical.",
         ],
         [
           "Partager ses données",
-          "Vous choisissez qui peut consulter votre dossier (médecin traitant, spécialistes...). Vous gardez la main sur le partage de vos informations de santé à tout moment.",
+          "Vous choisissez qui peut consulter votre dossier (médecin traitant, spécialistes...). Vous gardez la main sur le partage de vos informations de santé à tout moment, et pouvez le retirer quand vous voulez.",
+        ],
+        [
+          "Pourquoi s'en servir",
+          "Un nouveau médecin ou un service d'urgences accède immédiatement à votre historique (allergies, traitements) sans que vous ayez à tout redire ou à faire refaire des examens déjà réalisés.",
         ],
       ],
       keywords: [
@@ -159,6 +167,9 @@
         "donnees",
         "resultats",
         "analyses",
+        "connecter",
+        "identifiant",
+        "vaccinations",
       ],
     },
     {
@@ -175,16 +186,24 @@
         "Doctolib est un site et une application pour prendre rendez-vous avec des professionnels de santé, sans passer par le téléphone.",
       items: [
         [
+          "Pourquoi l'utiliser",
+          "Vous voyez en temps réel les vrais créneaux disponibles, sans attendre au téléphone ni tomber sur un cabinet injoignable. Utile aussi pour trouver un médecin qui accepte de nouveaux patients près de chez vous.",
+        ],
+        [
+          "Créer son compte",
+          "Un compte gratuit, avec une adresse email et un mot de passe (ou via FranceConnect). Vos coordonnées et votre carte Vitale peuvent être enregistrées une fois pour ne plus les ressaisir à chaque prise de rendez-vous.",
+        ],
+        [
           "Rechercher un professionnel",
           "Tapez une spécialité ou un nom (médecin, dentiste, kinésithérapeute...) et votre ville : les disponibilités s'affichent directement, sans appeler le cabinet.",
         ],
         [
           "Réserver un créneau",
-          "Choisissez le jour et l'heure qui vous conviennent parmi les créneaux libres, renseignez vos informations, et le rendez-vous est confirmé immédiatement.",
+          "Choisissez le jour et l'heure qui vous conviennent parmi les créneaux libres, renseignez le motif de consultation si demandé, et le rendez-vous est confirmé immédiatement à l'écran et par email.",
         ],
         [
           "Gérer son rendez-vous",
-          "Un rappel par SMS ou email est envoyé avant le rendez-vous. Vous pouvez l'annuler ou le modifier en ligne à tout moment, sans frais si c'est fait à temps.",
+          "Un rappel par SMS ou email est envoyé avant le rendez-vous. Vous pouvez l'annuler ou le modifier en ligne à tout moment ; annulez dès que possible si vous ne pouvez pas venir, pour libérer le créneau.",
         ],
       ],
       keywords: [

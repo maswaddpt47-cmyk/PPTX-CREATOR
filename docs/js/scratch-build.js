@@ -277,7 +277,7 @@
     return toolUse.input;
   }
 
-  /* options: { theme, notes, titre, thematique, targetMinutes, apiKey } */
+  /* options: { theme, notes, titre, thematique, targetMinutes, apiKey, forceApi } */
   async function buildScratchModel(options) {
     const maxSlides = computeMaxSlides(options.targetMinutes);
     // Match on the theme name alone, not the optional notes: the notes are
@@ -287,7 +287,7 @@
     // curated theme (confirmed: "insister sur la sécurité" alone was enough
     // to false-match the "authentification" theme via its "securite"
     // keyword, for a request that had nothing to do with authentification).
-    const match = matchThemeForScratch(options.theme);
+    const match = options.forceApi ? null : matchThemeForScratch(options.theme);
     if (match) {
       // A theme can belong to a `group` of related themes (see
       // pix-themes.js) — pull in the whole family, in catalog order, so
@@ -303,6 +303,7 @@
       return {
         model: modelFromCuratedThemes(themes, options.titre),
         source: "curated",
+        reason: "curated",
         themeHeading: themes.map((t) => t.heading).join(" + "),
       };
     }
@@ -313,20 +314,27 @@
       titre: options.titre,
       apiKey: options.apiKey,
     });
-    return { model: modelFromApiResult(input, options), source: "api" };
+    // Distinguish "asked for the richer API version on purpose" from "the
+    // library had nothing for this theme" — the status message reads very
+    // differently depending on which one actually happened.
+    const reason = options.forceApi && matchThemeForScratch(options.theme) ? "api-forced" : "api-no-match";
+    return { model: modelFromApiResult(input, options), source: "api", reason };
   }
 
   async function generateScratchDeck(gabaritBuffer, options) {
-    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES, notes: "" }, options);
+    options = Object.assign(
+      { titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES, notes: "", forceApi: false },
+      options
+    );
 
     const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
     const deck = new DeckBuilder(gabaritPkg);
     await deck.init();
 
-    const { model, source, themeHeading } = await buildScratchModel(options);
+    const { model, source, reason, themeHeading } = await buildScratchModel(options);
     await assembleDeck(deck, model, options);
     const blob = await deck.finalize();
-    return { blob, model, source, themeHeading, slideCount: model.contentSlides.length };
+    return { blob, model, source, reason, themeHeading, slideCount: model.contentSlides.length };
   }
 
   global.PG_SCRATCH_BUILD = {

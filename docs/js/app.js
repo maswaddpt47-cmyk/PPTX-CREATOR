@@ -391,6 +391,7 @@
   const scratchTargetMinutesEl = document.getElementById("scratch-target-minutes");
   const scratchMinutesPerSlideEl = document.getElementById("scratch-minutes-per-slide");
   const scratchApiKeyInput = document.getElementById("scratch-api-key");
+  const scratchForceApiInput = document.getElementById("scratch-force-api");
   const scratchSummaryEl = document.getElementById("scratch-summary");
   const scratchThemesCountEl = document.getElementById("scratch-themes-count");
   const scratchThemesListEl = document.getElementById("scratch-themes-list");
@@ -421,13 +422,14 @@
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const targetMinutes = parseInt(scratchTargetMinutesEl.value, 10) || window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
 
-    const { blob, source, themeHeading, slideCount } = await window.PG_SCRATCH_BUILD.generateScratchDeck(gabaritBuffer, {
+    const { blob, source, reason, themeHeading, slideCount } = await window.PG_SCRATCH_BUILD.generateScratchDeck(gabaritBuffer, {
       theme,
       notes: scratchNotesInput.value,
       titre: titreInput.value,
       thematique: thematiqueInput.value,
       targetMinutes,
       apiKey: scratchApiKeyInput.value.trim(),
+      forceApi: scratchForceApiInput.checked,
     });
 
     // Explicit, scannable flag for which content source this generation
@@ -436,8 +438,10 @@
     const badgeClass = source === "curated" ? "source-badge-pix" : "source-badge-api";
     const badgeText = source === "curated" ? "Source : bibliothèque PIX" : "Source : API Claude";
     const detail =
-      source === "curated"
+      reason === "curated"
         ? `Thème « ${themeHeading} » trouvé dans la bibliothèque PIX — aucun appel réseau.`
+        : reason === "api-forced"
+        ? `« Toujours utiliser l'API » coché — contenu généré par l'API Claude (${slideCount} diapositive(s) de contenu) malgré une correspondance dans la bibliothèque.`
         : `Aucun thème PIX ne correspondait à "${theme}" — contenu généré par l'API Claude (${slideCount} diapositive(s) de contenu).`;
     scratchSummaryEl.innerHTML = `<span class="source-badge ${badgeClass}">${badgeText}</span><p>${detail}</p>`;
     scratchSummaryEl.hidden = false;
