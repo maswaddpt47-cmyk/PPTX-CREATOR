@@ -4,13 +4,19 @@
 
    Populated automatically by source-extract.js's extractSourceModel()
    whenever a content slide carries its own image. Looked up by the other
-   modes (build.js's renderContentSlide, pix-build.js, merge-build.js) to
-   illustrate a slide that has no image of its own, via free-text
-   similarity — not a fixed theme id — so it works on arbitrary PPTX
-   content, not just the curated PIX theme library.
+   modes (build.js's renderContentSlide, merge-build.js) to illustrate a
+   slide that has no image of its own.
 
-   UNVERIFIED HEURISTIC: same Jaccard token-overlap approach as mode 4's
-   cross-source dedup, not yet tuned against a real, larger library. */
+   Picked at random (pickAny), not matched to the slide's content: an
+   earlier version tried free-text Jaccard similarity between the slide
+   and each entry's stored text, but confirmed in production this barely
+   ever cleared the match threshold (2 matches out of 29 slides on a real
+   deck) — these are decorative "images d'ambiance" the user collects
+   across every generated deck, not a tagged/categorized set, so a
+   same-topic match was rarely there to find. Treating the whole library
+   as one ambiance pool gives every slide a real illustration instead of
+   an empty placeholder, at the cost of no longer trying for topical
+   relevance — an accepted, explicit trade the user asked for. */
 (function (global) {
   "use strict";
 
@@ -19,7 +25,6 @@
   const DB_NAME = "pg-illustration-library";
   const DB_VERSION = 1;
   const STORE = "illustrations";
-  const MATCH_THRESHOLD = 0.15;
 
   let dbPromise = null;
   function openDb() {
@@ -128,30 +133,19 @@
     return union > 0 ? inter / union : 0;
   }
 
-  /* excludeIds: entries already picked for an earlier slide in the same
-     deck are skipped, so a topic family with several closely-related
-     slides (e.g. "Santé en ligne" + its "Mon Espace Santé"/"Doctolib"
-     companions) doesn't reuse the exact same illustration on multiple
-     slides just because the library's best match for each of them
-     independently happens to be the same under-covered entry — confirmed
-     in production: two slides in one deck both got the identical image.
-     Falls through to the next-best entry above the threshold, or no
-     illustration at all rather than a visible repeat. */
-  async function findBestMatch(queryText, excludeIds) {
+  /* Random pick from the whole library, treated as one undifferentiated
+     ambiance pool — see the file header for why this replaced a
+     similarity-based match. excludeIds: entries already picked for an
+     earlier slide in the same deck are skipped, so a deck with several
+     slides doesn't visibly repeat the same photo (still possible once
+     excludeIds covers the whole library — falls back to the full pool
+     rather than returning nothing). */
+  async function pickAny(excludeIds) {
     const all = await getAllIllustrations();
     if (!all.length) return null;
-    const queryTokens = new Set(tokenize(queryText));
-    let best = null;
-    let bestScore = 0;
-    for (const entry of all) {
-      if (excludeIds && excludeIds.has(entry.id)) continue;
-      const score = jaccard(queryTokens, new Set(tokenize(entry.text)));
-      if (score > bestScore) {
-        bestScore = score;
-        best = entry;
-      }
-    }
-    return bestScore >= MATCH_THRESHOLD ? best : null;
+    let pool = excludeIds ? all.filter((e) => !excludeIds.has(e.id)) : all;
+    if (!pool.length) pool = all;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   function bytesEqual(a, b) {
@@ -160,9 +154,8 @@
     return true;
   }
 
-  // Well above MATCH_THRESHOLD (which only needs a "good enough" topical
-  // match to illustrate a slide) — this one is asking "are these two
-  // library entries essentially the same content," a much stronger claim.
+  // "Are these two library entries essentially the same content" is a much
+  // stronger claim than illustrating a slide ever needed, hence the high bar.
   const NEAR_DUPLICATE_THRESHOLD = 0.5;
 
   /* Two-tier duplicate scan over the whole library:
@@ -170,9 +163,9 @@
        by length first, then compared directly — no hashing, so zero
        collision risk on a library this size). Unambiguous: safe to
        auto-suggest deleting all but one per group.
-     - nearPairs: entries whose stored text (title+intro+items, the same
-       field findBestMatch() compares) is highly similar by the existing
-       Jaccard measure, sorted by score descending. NOT auto-deletable —
+     - nearPairs: entries whose stored text (title+intro+items) is highly
+       similar by the Jaccard measure above, sorted by score descending.
+       NOT auto-deletable —
        two different slides can legitimately share most of their wording
        (e.g. two "créer votre mot de passe" sections) while carrying
        different, both-worth-keeping photos, so this tier is surfaced for
@@ -225,11 +218,10 @@
     addIllustration,
     getAllIllustrations,
     deleteIllustration,
-    findBestMatch,
+    pickAny,
     findDuplicateGroups,
     exportLibrary,
     importLibrary,
-    MATCH_THRESHOLD,
     NEAR_DUPLICATE_THRESHOLD,
   };
 })(window);
