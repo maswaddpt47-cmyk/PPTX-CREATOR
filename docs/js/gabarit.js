@@ -687,14 +687,24 @@
     return total;
   }
 
-  /* Avant-dernière page ("Pour aller plus loin"): replace the 4 "Lien"
-     bullets between "Sur la thématique :" and "Pour être accompagné...".
-     The second block is always left untouched (fixed per user decision).
-     The gabarit ships this box at cx=7427456 (~8.1in), sized for short
-     "Lien" placeholders — our suggestion labels ("Titre — url") are much
-     longer, so it's widened toward the full content width and its stored
-     height recomputed before filling, to avoid text overflowing past the
-     slide's bottom edge in viewers that don't honor spAutoFit. */
+  /* Avant-dernière page ("Pour aller plus loin"): the "Sur la thématique :"
+     block between the heading and "Pour être accompagné..." now tracks
+     however many suggestions actually apply, instead of always forcing
+     exactly the 4 "Lien" placeholders the gabarit ships with — confirmed
+     as a real complaint: a theme with only 1-2 genuinely relevant
+     resources was padding the rest with red "⚠ CONTENU MANQUANT" alerts,
+     which reads as content the user forgot to fill in rather than what it
+     actually is (nothing more relevant to suggest). Extra "Lien"
+     paragraphs (clones of the template one, same formatting) are added
+     when there are more than 4; unused ones are removed when there are
+     fewer, including the heading itself + its spacer when there are none
+     at all. The "Pour être accompagné..." block is always left untouched
+     (fixed per user decision). The gabarit ships this box at cx=7427456
+     (~8.1in), sized for short "Lien" placeholders — our suggestion labels
+     ("Titre — url") are much longer, so it's widened toward the full
+     content width and its stored height recomputed before filling, to
+     avoid text overflowing past the slide's bottom edge in viewers that
+     don't honor spAutoFit. */
   function setLiensSuggestions(doc, suggestions) {
     const shape = findShapeByName(doc, "ZoneTexte 9");
     if (!shape) throw new Error("Liens text box (ZoneTexte 9) not found");
@@ -703,34 +713,54 @@
     firstTag(xfrm, NS.a, "ext").setAttribute("cx", String(newWidth));
     const txBody = firstTag(shape, NS.p, "txBody");
     const allP = tag(txBody, NS.a, "p");
+
+    let headingPara = null;
+    let spacerPara = null;
+    let anchorPara = null; // "Pour être accompagné..." — new "Lien" paras are inserted before it
+    const lienParas = [];
     let inBlock = false;
-    let i = 0;
     for (const p of allP) {
       const txt = textOf(p).trim();
       if (txt === "Sur la thématique :") {
+        headingPara = p;
         inBlock = true;
+        continue;
+      }
+      if (inBlock && !spacerPara && txt === "") {
+        spacerPara = p;
         continue;
       }
       if (txt.startsWith("Pour être accompagné")) {
         inBlock = false;
+        anchorPara = p;
         continue;
       }
-      if (inBlock && txt === "Lien") {
-        const s = suggestions[i++];
-        if (s) {
-          const label = s.url ? `${s.title} — ${s.url}` : s.title;
-          setParagraphText(p, label);
-        } else {
-          setParagraphText(p, alertText("suggestion de ressource"));
-          markRunRed(p);
-        }
-        // The gabarit's "Lien" placeholder is sz2000 (20pt); our labels
-        // carry a title + URL and are much longer, so shrink just these
-        // generated lines to keep the box from needing extra wrapped lines.
-        const rPr = firstTag(runsOf(p)[0], NS.a, "rPr");
-        if (rPr) rPr.setAttribute("sz", "1400");
-      }
+      if (inBlock && txt === "Lien") lienParas.push(p);
     }
+
+    while (lienParas.length > suggestions.length) {
+      const p = lienParas.pop();
+      p.parentNode.removeChild(p);
+    }
+    while (lienParas.length < suggestions.length && lienParas.length) {
+      const clone = lienParas[lienParas.length - 1].cloneNode(true);
+      txBody.insertBefore(clone, anchorPara);
+      lienParas.push(clone);
+    }
+    if (!suggestions.length && headingPara) {
+      headingPara.parentNode.removeChild(headingPara);
+      if (spacerPara) spacerPara.parentNode.removeChild(spacerPara);
+    }
+
+    lienParas.forEach((p, i) => {
+      const label = suggestions[i].url ? `${suggestions[i].title} — ${suggestions[i].url}` : suggestions[i].title;
+      setParagraphText(p, label);
+      // The gabarit's "Lien" placeholder is sz2000 (20pt); our labels
+      // carry a title + URL and are much longer, so shrink just these
+      // generated lines to keep the box from needing extra wrapped lines.
+      const rPr = firstTag(runsOf(p)[0], NS.a, "rPr");
+      if (rPr) rPr.setAttribute("sz", "1400");
+    });
 
     const innerWidth = newWidth - 182880; // default 91440 lIns/rIns
     const boxTop = parseInt(firstTag(xfrm, NS.a, "off").getAttribute("y"), 10);
