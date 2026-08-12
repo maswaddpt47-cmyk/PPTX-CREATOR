@@ -240,13 +240,23 @@
     };
   }
 
-  async function callClaudeApi({ theme, notes, maxSlides, titre, apiKey }) {
+  async function callClaudeApi({ theme, notes, maxSlides, titre, apiKey, onStatus }) {
     if (!apiKey) {
       throw new Error(
         "Aucune clé API configurée. Renseignez votre clé API Claude dans le champ prévu pour ce mode."
       );
     }
     const prompt = buildPrompt({ theme, notes, maxSlides, titre });
+
+    // A ~30-slide request can take the API the better part of a minute —
+    // confirmed in production: with no feedback during that wait, it was
+    // impossible to tell a slow-but-working generation from a hung one.
+    if (onStatus) {
+      onStatus(
+        `Génération du contenu par l'API Claude (${maxSlides} diapositive(s) demandée(s)) — ` +
+          "ça peut prendre 30 à 60 secondes pour une séance longue…"
+      );
+    }
 
     let res;
     try {
@@ -327,6 +337,7 @@
       maxSlides,
       titre: options.titre,
       apiKey: options.apiKey,
+      onStatus: options.onStatus,
     });
     // Distinguish "asked for the richer API version on purpose" from "the
     // library had nothing for this theme" — the status message reads very
