@@ -52,7 +52,21 @@
       });
       if (exact) return { theme: exact, score: Infinity };
     }
-    return matchTheme(themeQuery);
+    const fallback = matchTheme(themeQuery);
+    if (!fallback) return null;
+    // Guard against a long, compound, multi-topic query matching a narrow
+    // theme through just a couple of incidentally shared generic keywords.
+    // Confirmed in production: a real request combining 3 distinct asks
+    // ("Démarches administratives : comment s'y retrouver ?", "service-
+    // public.fr", "Créer son Identité Numérique" — clearly meant as
+    // several separate themes) matched "Site institutionnel" via just the
+    // 2 shared words "demarches"/"administratives", producing a single
+    // slide instead of a properly-sized deck covering the actual request.
+    // matchTheme()'s MIN_SCORE=2 is an absolute floor tuned for OCR text;
+    // for a typed query, also require the matched keywords to explain a
+    // meaningful share of the query itself, not just clear that floor.
+    const coverage = fallback.score / queryTokens.size;
+    return coverage >= 0.3 ? fallback : null;
   }
 
   const API_KEY_STORAGE_KEY = "pg-anthropic-api-key";
