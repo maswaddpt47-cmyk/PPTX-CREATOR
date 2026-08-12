@@ -191,7 +191,11 @@
       `- Découpe le thème en sections cohérentes, chacune avec quelques diapositives de contenu.\n` +
       `- Prévois au total environ ${maxSlides} diapositive(s) de contenu (hors page de titre, sommaire, ` +
       `dividers de section et récapitulatif final).\n` +
-      `- Termine par une diapositive de récapitulatif ("closing") avec les points clés à retenir.\n`;
+      `- Termine par une diapositive de récapitulatif ("closing") avec les points clés à retenir.\n` +
+      `- Si le contenu doit mentionner un accompagnement humain en cas de blocage (lieu physique, ` +
+      `numéro à appeler, quelqu'un pour aider en personne), réfère-toi uniquement aux "conseillers et ` +
+      `médiateurs numériques du Département" — jamais au réseau France Services ni à un autre dispositif ` +
+      `national générique.\n`;
     if (titre) prompt += `- Le titre de l'atelier est déjà fixé : "${titre}" — n'en propose pas d'autre.\n`;
     if (notes && notes.trim()) {
       prompt += `\nObservations complémentaires à prendre en compte : ${notes.trim()}\n`;
