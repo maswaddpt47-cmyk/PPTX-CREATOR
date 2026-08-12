@@ -346,6 +346,16 @@
     return { model: modelFromApiResult(input, options), source: "api", reason };
   }
 
+  async function resolveAmbianceBytes(ambianceFiles) {
+    const out = [];
+    for (const file of ambianceFiles || []) {
+      const buf = await file.arrayBuffer();
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      out.push({ bytes: new Uint8Array(buf), ext });
+    }
+    return out;
+  }
+
   async function generateScratchDeck(gabaritBuffer, options) {
     options = Object.assign(
       { titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES, notes: "", forceApi: false },
@@ -357,6 +367,20 @@
     await deck.init();
 
     const { model, source, reason, themeHeading } = await buildScratchModel(options);
+
+    // User-supplied images take priority over the illustration library —
+    // useful when the generated text's own phrasing (especially from the
+    // API) doesn't literally overlap with anything already in the library,
+    // which otherwise leaves most slides with no illustration at all.
+    // Round-robin, same as pix-build.js/merge-build.js. Slides left
+    // without one still fall through to the library via pickImage().
+    const ambianceBytes = await resolveAmbianceBytes(options.ambianceFiles);
+    if (ambianceBytes.length) {
+      model.contentSlides.forEach((slide, i) => {
+        if (!slide.image) slide.image = ambianceBytes[i % ambianceBytes.length];
+      });
+    }
+
     await assembleDeck(deck, model, options);
     const blob = await deck.finalize();
     return { blob, model, source, reason, themeHeading, slideCount: model.contentSlides.length };

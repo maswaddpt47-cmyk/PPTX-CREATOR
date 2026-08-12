@@ -392,9 +392,12 @@
   const scratchMinutesPerSlideEl = document.getElementById("scratch-minutes-per-slide");
   const scratchApiKeyInput = document.getElementById("scratch-api-key");
   const scratchForceApiInput = document.getElementById("scratch-force-api");
+  const scratchAmbianceInput = document.getElementById("scratch-ambiance-input");
   const scratchSummaryEl = document.getElementById("scratch-summary");
   const scratchThemesCountEl = document.getElementById("scratch-themes-count");
   const scratchThemesListEl = document.getElementById("scratch-themes-list");
+
+  let scratchAmbianceFiles = [];
 
   scratchTargetMinutesEl.value = window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
   scratchMinutesPerSlideEl.textContent = window.PG_SCRATCH_BUILD.MINUTES_PER_SLIDE;
@@ -416,6 +419,10 @@
     window.PG_SCRATCH_BUILD.setStoredApiKey(scratchApiKeyInput.value.trim());
   });
 
+  scratchAmbianceInput.addEventListener("change", () => {
+    scratchAmbianceFiles = Array.from(scratchAmbianceInput.files || []);
+  });
+
   async function generateFromScratch() {
     const theme = scratchThemeInput.value.trim();
     setStatus(`Recherche du thème "${theme}" dans la bibliothèque PIX…`);
@@ -430,6 +437,7 @@
       targetMinutes,
       apiKey: scratchApiKeyInput.value.trim(),
       forceApi: scratchForceApiInput.checked,
+      ambianceFiles: scratchAmbianceFiles,
       onStatus: (text) => setStatus(text),
     });
 
