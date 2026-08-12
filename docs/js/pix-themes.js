@@ -93,6 +93,12 @@
     },
     {
       id: "santeenligne",
+      // group: themes sharing this value are generated together as one
+      // multi-section deck when any one of them is matched from a typed
+      // theme (see scratch-build.js) — this one is the "qui fait quoi"
+      // overview; monespacesante/doctolib below are its detailed
+      // companions, each laid out as its own self-contained section.
+      group: "sante",
       heading: "Santé en ligne",
       programmeBody: "Ameli, Mon Espace Santé, Doctolib : qui fait quoi.",
       title: "Suivre ses remboursements de santé en ligne",
@@ -113,6 +119,87 @@
         ],
       ],
       keywords: ["rembourse", "remboursement", "doctolib", "espace", "sante", "medecin", "traitant", "assurance", "maladie"],
+    },
+    {
+      // Grounded in the official "Grille parcours Médiation numérique" Pix
+      // reference (Santé page): "Découverte de Mon espace santé" (Mon
+      // espace santé, messagerie, partage de données) and "Les outils
+      // publics du numérique en santé" (Mon espace santé, Ameli.fr).
+      id: "monespacesante",
+      group: "sante",
+      heading: "Mon Espace Santé, en détail",
+      programmeBody: "Créer et utiliser son carnet de santé numérique.",
+      title: "Découvrir et utiliser Mon Espace Santé",
+      intro:
+        "Mon Espace Santé est votre carnet de santé numérique personnel, mis en place par l'Assurance Maladie.",
+      items: [
+        [
+          "Qu'est-ce que c'est ?",
+          "Un espace personnel et sécurisé qui regroupe vos documents médicaux : résultats d'analyses, ordonnances, comptes rendus. Il ne sert pas à suivre vos remboursements (c'est le rôle d'Ameli.fr).",
+        ],
+        [
+          "La messagerie sécurisée",
+          "Vous pouvez échanger des documents et des messages avec vos professionnels de santé (médecin, pharmacien...) directement depuis votre espace, en toute confidentialité.",
+        ],
+        [
+          "Partager ses données",
+          "Vous choisissez qui peut consulter votre dossier (médecin traitant, spécialistes...). Vous gardez la main sur le partage de vos informations de santé à tout moment.",
+        ],
+      ],
+      keywords: [
+        "espace",
+        "sante",
+        "carnet",
+        "dossier",
+        "medical",
+        "messagerie",
+        "ordonnances",
+        "documents",
+        "partage",
+        "donnees",
+        "resultats",
+        "analyses",
+      ],
+    },
+    {
+      // Doctolib doesn't have a dedicated parcours in the official Pix
+      // grille (unlike Mon Espace Santé) — grounded instead in the
+      // existing santeenligne entry's own description plus general
+      // knowledge of the service, not an official Pix source.
+      id: "doctolib",
+      group: "sante",
+      heading: "Doctolib, en détail",
+      programmeBody: "Prendre, modifier et annuler un rendez-vous médical en ligne.",
+      title: "Prendre rendez-vous avec Doctolib",
+      intro:
+        "Doctolib est un site et une application pour prendre rendez-vous avec des professionnels de santé, sans passer par le téléphone.",
+      items: [
+        [
+          "Rechercher un professionnel",
+          "Tapez une spécialité ou un nom (médecin, dentiste, kinésithérapeute...) et votre ville : les disponibilités s'affichent directement, sans appeler le cabinet.",
+        ],
+        [
+          "Réserver un créneau",
+          "Choisissez le jour et l'heure qui vous conviennent parmi les créneaux libres, renseignez vos informations, et le rendez-vous est confirmé immédiatement.",
+        ],
+        [
+          "Gérer son rendez-vous",
+          "Un rappel par SMS ou email est envoyé avant le rendez-vous. Vous pouvez l'annuler ou le modifier en ligne à tout moment, sans frais si c'est fait à temps.",
+        ],
+      ],
+      keywords: [
+        "doctolib",
+        "rendez",
+        "rdv",
+        "creneau",
+        "creneaux",
+        "medecin",
+        "dentiste",
+        "professionnel",
+        "reserver",
+        "consultation",
+        "annuler",
+      ],
     },
     {
       id: "formulaireadministratif",
