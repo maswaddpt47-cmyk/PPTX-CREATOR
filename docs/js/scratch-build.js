@@ -21,6 +21,39 @@
   const { PptxPackage, DeckBuilder } = window.PG_OOXML;
   const { assembleDeck, computeMaxSlides, MINUTES_PER_SLIDE, DEFAULT_TARGET_MINUTES } = window.PG_BUILD;
   const { matchTheme } = window.PG_PIX_EXTRACT;
+  const { THEMES } = window.PG_PIX_THEMES;
+  const { tokenize } = window.PG_SOURCE;
+
+  /* matchTheme()'s keyword-count scoring (MIN_SCORE=2 distinct keyword
+     hits) was tuned for OCR'd screenshot text, which is naturally long and
+     redundant. A short typed theme name often can't reach 2 keyword hits
+     even against its own theme — confirmed in production: typing "Santé
+     en ligne" verbatim (the theme's own heading) scored only 1 ("sante";
+     "ligne" isn't a keyword and shouldn't be, it's far too generic)
+     and fell through to the API unnecessarily. This adds a fast path in
+     front of it: if the query's tokens are a subset of a theme's own
+     heading/title tokens (or vice versa), that's effectively the user
+     typing the theme's own name — a much stronger, still low-risk signal
+     than a handful of shared keywords, since it requires full containment
+     rather than a couple of incidental hits. */
+  function matchThemeForScratch(themeQuery) {
+    const queryTokens = new Set(tokenize(themeQuery));
+    if (queryTokens.size) {
+      const isSubset = (a, b) => a.size > 0 && [...a].every((tok) => b.has(tok));
+      const exact = THEMES.find((t) => {
+        const headingTokens = new Set(tokenize(t.heading));
+        const titleTokens = new Set(tokenize(t.title));
+        return (
+          isSubset(queryTokens, headingTokens) ||
+          isSubset(headingTokens, queryTokens) ||
+          isSubset(queryTokens, titleTokens) ||
+          isSubset(titleTokens, queryTokens)
+        );
+      });
+      if (exact) return { theme: exact, score: Infinity };
+    }
+    return matchTheme(themeQuery);
+  }
 
   const API_KEY_STORAGE_KEY = "pg-anthropic-api-key";
   const API_MODEL = "claude-sonnet-5";
@@ -45,23 +78,25 @@
     }
   }
 
-  /* Single curated theme -> the same model shape a real source deck would
-     produce, so it can go straight into assembleDeck(). Kept deliberately
-     small (one section, one slide) since the catalog only ever offers one
-     match per free-text theme in practice. */
-  function modelFromCuratedTheme(theme, titre) {
+  /* One or more curated themes -> the same model shape a real source deck
+     would produce, so it can go straight into assembleDeck(). Each theme
+     becomes its own programme section — assembleDeck() already renders a
+     dedicated divider + its own cards per section, so a "family" of
+     related themes (see pix-themes.js's `group` field — e.g. "Santé en
+     ligne" plus its "Mon Espace Santé"/"Doctolib" companions) comes out as
+     a multi-section deck, each section laid out as if it were its own
+     standalone presentation, with zero new rendering logic. */
+  function modelFromCuratedThemes(themes, titre) {
     return {
-      title: { main: (titre || "").trim() || theme.title, intro: "", tags: [] },
-      programme: [{ heading: theme.heading, body: theme.programmeBody }],
-      contentSlides: [
-        {
-          title: theme.title,
-          intro: theme.intro,
-          items: theme.items.map(([heading, body]) => ({ heading, body })),
-          image: null,
-          table: null,
-        },
-      ],
+      title: { main: (titre || "").trim() || themes[0].title, intro: "", tags: [] },
+      programme: themes.map((t) => ({ heading: t.heading, body: t.programmeBody })),
+      contentSlides: themes.map((t) => ({
+        title: t.title,
+        intro: t.intro,
+        items: t.items.map(([heading, body]) => ({ heading, body })),
+        image: null,
+        table: null,
+      })),
       closing: null,
     };
   }
@@ -252,9 +287,24 @@
     // curated theme (confirmed: "insister sur la sécurité" alone was enough
     // to false-match the "authentification" theme via its "securite"
     // keyword, for a request that had nothing to do with authentification).
-    const match = matchTheme(options.theme);
+    const match = matchThemeForScratch(options.theme);
     if (match) {
-      return { model: modelFromCuratedTheme(match.theme, options.titre), source: "curated", themeHeading: match.theme.heading };
+      // A theme can belong to a `group` of related themes (see
+      // pix-themes.js) — pull in the whole family, in catalog order, so
+      // e.g. matching "Santé en ligne" also brings its "Mon Espace Santé"
+      // and "Doctolib" companions rather than just the one theme whose
+      // keywords happened to score highest.
+      const group = match.theme.group;
+      const groupThemes = group ? THEMES.filter((t) => t.group === group) : [match.theme];
+      // Same duration budget every other mode respects — a 3-section
+      // family can still overshoot a short target, so trim from the end
+      // (catalog order: overview first, most-detailed companions last).
+      const themes = groupThemes.slice(0, maxSlides);
+      return {
+        model: modelFromCuratedThemes(themes, options.titre),
+        source: "curated",
+        themeHeading: themes.map((t) => t.heading).join(" + "),
+      };
     }
     const input = await callClaudeApi({
       theme: options.theme,
