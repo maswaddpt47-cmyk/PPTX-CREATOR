@@ -147,15 +147,20 @@
      slide has one) get a chance to borrow a similarity-matched illustration
      from the persistent library (illustration-library.js) before falling
      back to no illustration at all. A slide's own extracted image always
-     wins when it has one. */
-  async function pickImage(slide) {
+     wins when it has one. usedIds: illustration ids already spent on an
+     earlier slide in this same deck, so one closely-related family of
+     slides doesn't all borrow the identical library entry — see
+     findBestMatch()'s own comment for why this matters. */
+  async function pickImage(slide, usedIds) {
     if (slide.image) return slide.image;
     if (!window.PG_ILLUSTRATIONS) return null;
-    const match = await window.PG_ILLUSTRATIONS.findBestMatch(slideText(slide));
-    return match ? { bytes: match.bytes, ext: match.ext } : null;
+    const match = await window.PG_ILLUSTRATIONS.findBestMatch(slideText(slide), usedIds);
+    if (!match) return null;
+    if (usedIds) usedIds.add(match.id);
+    return { bytes: match.bytes, ext: match.ext };
   }
 
-  async function renderContentSlide(deck, slide) {
+  async function renderContentSlide(deck, slide, usedIds) {
     if (slide.table) {
       const clone = await deck.cloneSlide(7);
       const doc = await deck.loadSlideDoc(clone.num);
@@ -170,7 +175,7 @@
       return clone;
     }
 
-    const image = await pickImage(slide);
+    const image = await pickImage(slide, usedIds);
     // importMedia() returns null for an unrecognized image format (e.g. a
     // codec PowerPoint itself wouldn't render) — treat that exactly like no
     // image at all rather than embedding a part PowerPoint will refuse to
@@ -236,6 +241,7 @@
       deck.relIdForExistingSlide(5),
     ];
 
+    const usedIllustrationIds = new Set();
     const groups = classifyContentSlides(model.contentSlides, model.programme);
     for (let ci = 0; ci < groups.length; ci++) {
       const groupSlides = groups[ci];
@@ -250,13 +256,13 @@
       }
 
       for (const slide of groupSlides) {
-        const rendered = await renderContentSlide(deck, slide);
+        const rendered = await renderContentSlide(deck, slide, usedIllustrationIds);
         orderedRelIds.push(rendered.relId);
       }
     }
 
     if (model.closing) {
-      const rendered = await renderContentSlide(deck, model.closing);
+      const rendered = await renderContentSlide(deck, model.closing, usedIllustrationIds);
       orderedRelIds.push(rendered.relId);
     }
 

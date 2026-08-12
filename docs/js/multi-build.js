@@ -104,6 +104,7 @@
 
     // Phase 2: render the surviving, trimmed entries, emitting a divider
     // only at each group's first surviving entry.
+    const usedIllustrationIds = new Set();
     const sommaireHeadings = [];
     for (let i = 0; i < kept.length; i++) {
       const { heading, slide } = kept[i];
@@ -115,7 +116,7 @@
         deck.saveSlideDoc(divider.num, divDoc);
         orderedRelIds.push(divider.relId);
       }
-      const rendered = await renderContentSlide(deck, slide);
+      const rendered = await renderContentSlide(deck, slide, usedIllustrationIds);
       orderedRelIds.push(rendered.relId);
     }
 
