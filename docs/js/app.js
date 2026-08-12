@@ -666,6 +666,34 @@
     }
   });
 
+  const illustrationUploadInput = document.getElementById("illustration-upload-input");
+
+  /* Manual upload, separate from the .json import above: lets the user add
+     their own photos/pictos directly (label derived from the filename,
+     since there's no per-illustration rename UI) rather than only ever
+     growing the library indirectly through processed PPTX files. */
+  illustrationUploadInput.addEventListener("change", async () => {
+    const files = Array.from(illustrationUploadInput.files || []);
+    illustrationUploadInput.value = "";
+    if (!files.length) return;
+    let added = 0;
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const label = file.name.replace(/\.[^.]+$/, "").trim() || "Illustration";
+      const buf = await file.arrayBuffer();
+      const before = (await window.PG_ILLUSTRATIONS.getAllIllustrations()).length;
+      await window.PG_ILLUSTRATIONS.addIllustration({ label, text: label, bytes: new Uint8Array(buf), ext });
+      const after = (await window.PG_ILLUSTRATIONS.getAllIllustrations()).length;
+      if (after > before) added++;
+    }
+    await refreshIllustrationPanel();
+    const skipped = files.length - added;
+    setStatus(
+      `${added} image(s) ajoutée(s) à la bibliothèque${skipped ? ` (${skipped} déjà présente(s), ignorée(s))` : ""}.`,
+      "success"
+    );
+  });
+
   /* ---------- Shared generate button ---------- */
 
   generateBtn.addEventListener("click", async () => {
