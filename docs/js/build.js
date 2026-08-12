@@ -59,6 +59,11 @@
     },
   ];
 
+  /* No fixed count: returns however many curated resources genuinely
+     score above 0 (bounded only by KNOWN_RESOURCES.length) — setLiensSuggestions()
+     renders exactly that many "Lien" lines, neither padding a thin match
+     with a red "missing" alert nor capping off a broad theme's other
+     genuinely relevant suggestions. */
   function pickLienSuggestions(model) {
     const corpus = [
       model.title.main,
@@ -72,7 +77,7 @@
     }))
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score);
-    return scored.slice(0, 4).map((s) => ({ title: s.res.title, url: s.res.url }));
+    return scored.map((s) => ({ title: s.res.title, url: s.res.url }));
   }
 
   /* Minimal PNG/JPEG dimension sniffers — needed to place the source's
