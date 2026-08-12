@@ -238,6 +238,18 @@
     </div>
 
     <div class="field">
+      <label for="scratch-ambiance-input">Images d'ambiance <span class="optional">— optionnel</span></label>
+      <input id="scratch-ambiance-input" type="file" accept="image/*" multiple />
+      <p class="hint">
+        Vos propres illustrations, réparties sur les diapositives générées —
+        prioritaires sur la bibliothèque d'illustrations. Utile quand le
+        contenu généré (surtout par l'API) est rédigé avec un phrasé
+        différent de vos anciens PPTX, ce qui peut empêcher la
+        correspondance automatique de trouver une image pertinente.
+      </p>
+    </div>
+
+    <div class="field">
       <label for="scratch-api-key">Clé API Claude <span class="optional">— seulement si le thème n'est pas déjà dans la bibliothèque</span></label>
       <input id="scratch-api-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
       <p class="hint">
