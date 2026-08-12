@@ -114,6 +114,35 @@ h1 {
   background: #EAF2F8;
 }
 
+.illustration-view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.view-toggle-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: #fff;
+  color: #777;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+}
+
+.view-toggle-btn.active {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.illustration-grid[hidden],
+.slideshow-viewer[hidden] {
+  display: none;
+}
+
 .illustration-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
