@@ -142,24 +142,17 @@
     return { x: slot.x + (slot.cx - cx) / 2, y: slot.y + (slot.cy - cy) / 2, cx, cy };
   }
 
-  function slideText(slide) {
-    const parts = [slide.title, slide.intro];
-    for (const item of slide.items || []) parts.push(item.heading, item.body);
-    return parts.join(" ");
-  }
-
   /* Slides with no image of their own (common in real decks — not every
-     slide has one) get a chance to borrow a similarity-matched illustration
-     from the persistent library (illustration-library.js) before falling
-     back to no illustration at all. A slide's own extracted image always
-     wins when it has one. usedIds: illustration ids already spent on an
-     earlier slide in this same deck, so one closely-related family of
-     slides doesn't all borrow the identical library entry — see
-     findBestMatch()'s own comment for why this matters. */
+     slide has one) borrow a random entry from the persistent illustration
+     library (illustration-library.js), treated as a generic ambiance pool
+     rather than matched to the slide's content — see that file's header
+     comment for why. A slide's own extracted image always wins when it has
+     one. usedIds: illustration ids already spent on an earlier slide in
+     this same deck, so a deck doesn't visibly repeat the same photo. */
   async function pickImage(slide, usedIds) {
     if (slide.image) return slide.image;
     if (!window.PG_ILLUSTRATIONS) return null;
-    const match = await window.PG_ILLUSTRATIONS.findBestMatch(slideText(slide), usedIds);
+    const match = await window.PG_ILLUSTRATIONS.pickAny(usedIds);
     if (!match) return null;
     if (usedIds) usedIds.add(match.id);
     return { bytes: match.bytes, ext: match.ext };

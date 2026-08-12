@@ -86,11 +86,11 @@
     const pixEntries = [];
     for (let i = 0; i < matchedThemes.length; i++) {
       const theme = matchedThemes[i];
+      // Explicit ambiance upload, else the theme's own curated pictogram —
+      // already theme-specific, so no need for a random photo from the
+      // persistent illustration library the way plain old-deck slides
+      // (below) without a curated pictogram of their own do.
       let image = ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : null;
-      if (!image && window.PG_ILLUSTRATIONS) {
-        const match = await window.PG_ILLUSTRATIONS.findBestMatch(`${theme.heading} ${theme.intro}`);
-        if (match) image = { bytes: match.bytes, ext: match.ext };
-      }
       if (!image) image = pictoImage(theme.id);
       pixEntries.push({
         programme: { heading: theme.heading, body: theme.programmeBody },

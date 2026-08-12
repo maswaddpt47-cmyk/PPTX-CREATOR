@@ -56,10 +56,10 @@
   /* matchedThemeIds/unmatched/perFile come from pix-extract.js's
      extractPixModel(). Illustration priority per theme: an explicit
      ambiance image (round-robin across matched themes) if the user
-     supplied any; otherwise a real illustration borrowed from the
-     persistent library (illustration-library.js) if a similar one has
-     been learned from a past PPTX; otherwise that theme's generic
-     pictogram as a last resort. */
+     supplied any; otherwise that theme's own curated pictogram, which is
+     already theme-specific — no need to fall back further to a random,
+     unrelated photo from the persistent illustration library the way
+     other modes without a curated pictogram do. */
   async function buildPixModel(matchedThemeIds, unmatched, perFile, ambianceFiles, options) {
     const counts = {};
     for (const f of perFile || []) if (f.theme) counts[f.theme] = (counts[f.theme] || 0) + 1;
@@ -84,10 +84,6 @@
     for (let i = 0; i < matchedThemes.length; i++) {
       const theme = matchedThemes[i];
       let image = ambianceBytes.length ? ambianceBytes[i % ambianceBytes.length] : null;
-      if (!image && window.PG_ILLUSTRATIONS) {
-        const match = await window.PG_ILLUSTRATIONS.findBestMatch(`${theme.heading} ${theme.intro}`);
-        if (match) image = { bytes: match.bytes, ext: match.ext };
-      }
       if (!image) image = pictoImage(theme.id);
       contentSlides.push({
         title: theme.title,
