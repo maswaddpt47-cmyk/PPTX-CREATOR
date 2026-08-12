@@ -37,8 +37,32 @@
       </label>
       <button id="illustration-cleanup-btn" type="button">Analyser les doublons</button>
     </div>
+    <div class="illustration-view-toggle" role="group" aria-label="Mode d'affichage">
+      <button id="illustration-view-grid-btn" type="button" class="view-toggle-btn active">Vignettes</button>
+      <button id="illustration-view-slideshow-btn" type="button" class="view-toggle-btn">Diaporama</button>
+    </div>
     <div id="illustration-cleanup-results"></div>
     <div id="illustration-grid" class="illustration-grid"></div>
+    <div id="slideshow-viewer" class="slideshow-viewer" hidden>
+      <div class="slideshow-stage">
+        <button id="slideshow-prev" type="button" class="slideshow-nav" aria-label="Illustration précédente">‹</button>
+        <div class="slideshow-image-wrap">
+          <img id="slideshow-image" alt="" />
+        </div>
+        <button id="slideshow-next" type="button" class="slideshow-nav" aria-label="Illustration suivante">›</button>
+      </div>
+      <div class="slideshow-meta">
+        <span id="slideshow-label" class="slideshow-label"></span>
+        <span id="slideshow-counter" class="slideshow-counter"></span>
+      </div>
+      <div class="slideshow-actions">
+        <button id="slideshow-download" type="button">Télécharger</button>
+        <button id="slideshow-delete" type="button">Supprimer</button>
+      </div>
+    </div>
+    <p id="slideshow-empty" class="hint" hidden>
+      La bibliothèque est vide — ajoutez des illustrations ci-dessus.
+    </p>
   </details>
 
   <div class="mode-tabs" role="tablist">
@@ -56,9 +80,6 @@
     </button>
     <button id="tab-scratch" class="mode-tab" role="tab" aria-selected="false" type="button">
       Créer depuis un thème
-    </button>
-    <button id="tab-slideshow" class="mode-tab" role="tab" aria-selected="false" type="button">
-      Diaporama illustrations
     </button>
   </div>
 
@@ -281,35 +302,6 @@
     </div>
 
     <div id="scratch-summary" class="pix-summary" hidden></div>
-  </section>
-
-  <section id="mode-slideshow" class="mode-panel" hidden>
-    <p class="lead">
-      Parcourez les illustrations de la bibliothèque une par une, en grand
-      format — pour les revoir, les trier ou décider ce qui vaut la peine
-      d'être gardé.
-    </p>
-    <div id="slideshow-viewer" class="slideshow-viewer">
-      <div class="slideshow-stage">
-        <button id="slideshow-prev" type="button" class="slideshow-nav" aria-label="Illustration précédente">‹</button>
-        <div class="slideshow-image-wrap">
-          <img id="slideshow-image" alt="" />
-        </div>
-        <button id="slideshow-next" type="button" class="slideshow-nav" aria-label="Illustration suivante">›</button>
-      </div>
-      <div class="slideshow-meta">
-        <span id="slideshow-label" class="slideshow-label"></span>
-        <span id="slideshow-counter" class="slideshow-counter"></span>
-      </div>
-      <div class="slideshow-actions">
-        <button id="slideshow-download" type="button">Télécharger</button>
-        <button id="slideshow-delete" type="button">Supprimer</button>
-      </div>
-    </div>
-    <p id="slideshow-empty" class="hint" hidden>
-      La bibliothèque est vide — ajoutez des illustrations depuis le panneau
-      « Bibliothèque d'illustrations » en haut de la page.
-    </p>
   </section>
 
   <div id="generation-fields">

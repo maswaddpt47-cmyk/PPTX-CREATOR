@@ -89,21 +89,17 @@
   const tabMerge = document.getElementById("tab-merge");
   const tabMulti = document.getElementById("tab-multi");
   const tabScratch = document.getElementById("tab-scratch");
-  const tabSlideshow = document.getElementById("tab-slideshow");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
   const modeMulti = document.getElementById("mode-multi");
   const modeScratch = document.getElementById("mode-scratch");
-  const modeSlideshow = document.getElementById("mode-slideshow");
-  const generationFieldsEl = document.getElementById("generation-fields");
   const tabs = [
     { key: "pptx", tab: tabPptx, panel: modePptx },
     { key: "pix", tab: tabPix, panel: modePix },
     { key: "merge", tab: tabMerge, panel: modeMerge },
     { key: "multi", tab: tabMulti, panel: modeMulti },
     { key: "scratch", tab: tabScratch, panel: modeScratch },
-    { key: "slideshow", tab: tabSlideshow, panel: modeSlideshow },
   ];
 
   let mode = "pptx";
@@ -113,8 +109,7 @@
     else if (mode === "pix") generateBtn.disabled = pixFiles.length === 0;
     else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
     else if (mode === "multi") generateBtn.disabled = multiFiles.length < 2;
-    else if (mode === "scratch") generateBtn.disabled = !scratchThemeInput.value.trim();
-    else generateBtn.disabled = true; // slideshow: not a generation mode
+    else generateBtn.disabled = !scratchThemeInput.value.trim();
   }
 
   function setMode(next) {
@@ -125,14 +120,8 @@
       t.tab.setAttribute("aria-selected", String(active));
       t.panel.hidden = !active;
     }
-    // The "titre"/"thematique"/generate button block only applies to the
-    // generation modes — the slideshow tab is a pure library browser, so
-    // hide it there rather than show a "Générer le PPTX" button that does
-    // nothing meaningful in this tab.
-    generationFieldsEl.hidden = mode === "slideshow";
     setStatus("");
     refreshGenerateEnabled();
-    if (mode === "slideshow") refreshSlideshow();
   }
 
   tabPptx.addEventListener("click", () => setMode("pptx"));
@@ -140,7 +129,6 @@
   tabMerge.addEventListener("click", () => setMode("merge"));
   tabMulti.addEventListener("click", () => setMode("multi"));
   tabScratch.addEventListener("click", () => setMode("scratch"));
-  tabSlideshow.addEventListener("click", () => setMode("slideshow"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
 
@@ -481,6 +469,26 @@
   const illustrationCountEl = document.getElementById("illustration-count");
   const illustrationGridEl = document.getElementById("illustration-grid");
   const illustrationPanel = document.getElementById("illustration-library-panel");
+  const illustrationViewGridBtn = document.getElementById("illustration-view-grid-btn");
+  const illustrationViewSlideshowBtn = document.getElementById("illustration-view-slideshow-btn");
+  const slideshowViewerEl = document.getElementById("slideshow-viewer");
+  const slideshowEmptyEl = document.getElementById("slideshow-empty");
+  const slideshowImageEl = document.getElementById("slideshow-image");
+  const slideshowLabelEl = document.getElementById("slideshow-label");
+  const slideshowCounterEl = document.getElementById("slideshow-counter");
+  const slideshowPrevBtn = document.getElementById("slideshow-prev");
+  const slideshowNextBtn = document.getElementById("slideshow-next");
+  const slideshowDownloadBtn = document.getElementById("slideshow-download");
+  const slideshowDeleteBtn = document.getElementById("slideshow-delete");
+
+  /* "Vignettes" (grid, the original view) vs "Diaporama" (one image at a
+     time) — two ways to browse the same library, switchable in place
+     rather than split across separate tabs, so the export/import/upload
+     toolbar above stays available no matter which view is active. */
+  let illustrationView = "grid";
+  let slideshowEntries = [];
+  let slideshowIndex = 0;
+  let slideshowObjectUrl = null;
 
   /* Shared thumbnail card — used by the main grid and the cleanup review
      views below, so a "Supprimer" action always looks and behaves the
@@ -507,10 +515,7 @@
     return { item, blob };
   }
 
-  async function refreshIllustrationPanel() {
-    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
-    illustrationCountEl.textContent = all.length;
-    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
+  function renderIllustrationGrid(all) {
     illustrationGridEl.innerHTML = "";
     for (const entry of all) {
       const { item, blob } = buildIllustrationCard(entry, [
@@ -533,26 +538,9 @@
     }
   }
 
-  illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
-  refreshIllustrationPanel();
-
-  /* ---------- Slideshow tab: browse the library one image at a time ---------- */
-
-  const slideshowViewerEl = document.getElementById("slideshow-viewer");
-  const slideshowEmptyEl = document.getElementById("slideshow-empty");
-  const slideshowImageEl = document.getElementById("slideshow-image");
-  const slideshowLabelEl = document.getElementById("slideshow-label");
-  const slideshowCounterEl = document.getElementById("slideshow-counter");
-  const slideshowPrevBtn = document.getElementById("slideshow-prev");
-  const slideshowNextBtn = document.getElementById("slideshow-next");
-  const slideshowDownloadBtn = document.getElementById("slideshow-download");
-  const slideshowDeleteBtn = document.getElementById("slideshow-delete");
-
-  let slideshowEntries = [];
-  let slideshowIndex = 0;
-  let slideshowObjectUrl = null;
-
-  function renderSlideshowSlide() {
+  function renderSlideshowSlide(all) {
+    slideshowEntries = all;
+    if (slideshowIndex >= slideshowEntries.length) slideshowIndex = Math.max(0, slideshowEntries.length - 1);
     const empty = slideshowEntries.length === 0;
     slideshowViewerEl.hidden = empty;
     slideshowEmptyEl.hidden = !empty;
@@ -569,19 +557,34 @@
     slideshowNextBtn.disabled = slideshowEntries.length < 2;
   }
 
-  /* Reloads from IndexedDB every time the tab is opened, so illustrations
-     added/removed elsewhere (upload, import, cleanup, or this tab's own
-     "Supprimer") are always reflected rather than showing a stale list. */
-  async function refreshSlideshow() {
-    slideshowEntries = await window.PG_ILLUSTRATIONS.getAllIllustrations();
-    if (slideshowIndex >= slideshowEntries.length) slideshowIndex = Math.max(0, slideshowEntries.length - 1);
-    renderSlideshowSlide();
+  async function refreshIllustrationPanel() {
+    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
+    illustrationCountEl.textContent = all.length;
+    illustrationGridEl.hidden = illustrationView !== "grid";
+    slideshowViewerEl.hidden = illustrationView !== "slideshow" || all.length === 0;
+    slideshowEmptyEl.hidden = illustrationView !== "slideshow" || all.length > 0;
+    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
+    if (illustrationView === "grid") renderIllustrationGrid(all);
+    else renderSlideshowSlide(all);
   }
+
+  function setIllustrationView(view) {
+    illustrationView = view;
+    illustrationViewGridBtn.classList.toggle("active", view === "grid");
+    illustrationViewSlideshowBtn.classList.toggle("active", view === "slideshow");
+    refreshIllustrationPanel();
+  }
+
+  illustrationViewGridBtn.addEventListener("click", () => setIllustrationView("grid"));
+  illustrationViewSlideshowBtn.addEventListener("click", () => setIllustrationView("slideshow"));
+
+  illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
+  refreshIllustrationPanel();
 
   function slideshowStep(delta) {
     if (slideshowEntries.length < 2) return;
     slideshowIndex = (slideshowIndex + delta + slideshowEntries.length) % slideshowEntries.length;
-    renderSlideshowSlide();
+    renderSlideshowSlide(slideshowEntries);
   }
 
   slideshowPrevBtn.addEventListener("click", () => slideshowStep(-1));
@@ -598,12 +601,11 @@
     const entry = slideshowEntries[slideshowIndex];
     if (!entry) return;
     await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-    await refreshSlideshow();
     await refreshIllustrationPanel();
   });
 
   document.addEventListener("keydown", (e) => {
-    if (mode !== "slideshow") return;
+    if (!illustrationPanel.open || illustrationView !== "slideshow") return;
     if (e.key === "ArrowLeft") slideshowStep(-1);
     else if (e.key === "ArrowRight") slideshowStep(1);
   });
