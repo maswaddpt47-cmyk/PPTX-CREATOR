@@ -89,17 +89,21 @@
   const tabMerge = document.getElementById("tab-merge");
   const tabMulti = document.getElementById("tab-multi");
   const tabScratch = document.getElementById("tab-scratch");
+  const tabIllustrations = document.getElementById("tab-illustrations");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
   const modeMulti = document.getElementById("mode-multi");
   const modeScratch = document.getElementById("mode-scratch");
+  const modeIllustrations = document.getElementById("mode-illustrations");
+  const generationFieldsEl = document.getElementById("generation-fields");
   const tabs = [
     { key: "pptx", tab: tabPptx, panel: modePptx },
     { key: "pix", tab: tabPix, panel: modePix },
     { key: "merge", tab: tabMerge, panel: modeMerge },
     { key: "multi", tab: tabMulti, panel: modeMulti },
     { key: "scratch", tab: tabScratch, panel: modeScratch },
+    { key: "illustrations", tab: tabIllustrations, panel: modeIllustrations },
   ];
 
   let mode = "pptx";
@@ -109,7 +113,8 @@
     else if (mode === "pix") generateBtn.disabled = pixFiles.length === 0;
     else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
     else if (mode === "multi") generateBtn.disabled = multiFiles.length < 2;
-    else generateBtn.disabled = !scratchThemeInput.value.trim();
+    else if (mode === "scratch") generateBtn.disabled = !scratchThemeInput.value.trim();
+    else generateBtn.disabled = true; // illustrations: not a generation mode
   }
 
   function setMode(next) {
@@ -120,8 +125,14 @@
       t.tab.setAttribute("aria-selected", String(active));
       t.panel.hidden = !active;
     }
+    // The "titre"/"thematique"/generate button block only applies to the
+    // generation modes — the illustrations tab is a pure library browser,
+    // so hide it there rather than show a "Générer le PPTX" button that
+    // does nothing meaningful in this tab.
+    generationFieldsEl.hidden = mode === "illustrations";
     setStatus("");
     refreshGenerateEnabled();
+    if (mode === "illustrations") refreshIllustrationPanel();
   }
 
   tabPptx.addEventListener("click", () => setMode("pptx"));
@@ -129,6 +140,7 @@
   tabMerge.addEventListener("click", () => setMode("merge"));
   tabMulti.addEventListener("click", () => setMode("multi"));
   tabScratch.addEventListener("click", () => setMode("scratch"));
+  tabIllustrations.addEventListener("click", () => setMode("illustrations"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
 
@@ -468,7 +480,6 @@
 
   const illustrationCountEl = document.getElementById("illustration-count");
   const illustrationGridEl = document.getElementById("illustration-grid");
-  const illustrationPanel = document.getElementById("illustration-library-panel");
   const illustrationLightboxEl = document.getElementById("illustration-lightbox");
   const illustrationLightboxImgEl = document.getElementById("illustration-lightbox-img");
   const illustrationLightboxLabelEl = document.getElementById("illustration-lightbox-label");
@@ -523,7 +534,7 @@
   async function refreshIllustrationPanel() {
     const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
     illustrationCountEl.textContent = all.length;
-    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
+    if (mode !== "illustrations") return; // avoid building object URLs while the tab isn't active
     illustrationGridEl.innerHTML = "";
     for (const entry of all) {
       const { item, blob } = buildIllustrationCard(entry, [
@@ -546,7 +557,6 @@
     }
   }
 
-  illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
   refreshIllustrationPanel();
 
   /* ---------- Illustration cleanup: exact + near-duplicate review ---------- */

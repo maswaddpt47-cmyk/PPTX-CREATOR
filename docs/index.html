@@ -16,31 +16,6 @@
     compris pour la lecture des captures ci-dessous).
   </p>
 
-  <details id="illustration-library-panel" class="illustration-panel">
-    <summary>Bibliothèque d'illustrations (<span id="illustration-count">0</span>)</summary>
-    <p class="hint">
-      Alimentée automatiquement à chaque PPTX traité (n'importe quel mode) :
-      chaque illustration présente dans un fichier source est conservée ici
-      et réutilisée plus tard pour illustrer une diapositive qui n'en a pas
-      — stockée uniquement dans ce navigateur, jamais envoyée nulle part.
-    </p>
-    <div class="illustration-actions">
-      <label class="illustration-import-label">
-        Ajouter des images
-        <input id="illustration-upload-input" type="file" accept="image/*" multiple hidden />
-      </label>
-      <button id="illustration-export-btn" type="button">Exporter (fichier .json)</button>
-      <button id="illustration-zip-btn" type="button">Télécharger tout (.zip)</button>
-      <label class="illustration-import-label">
-        Importer (fichier .json)
-        <input id="illustration-import-input" type="file" accept=".json" hidden />
-      </label>
-      <button id="illustration-cleanup-btn" type="button">Analyser les doublons</button>
-    </div>
-    <div id="illustration-cleanup-results"></div>
-    <div id="illustration-grid" class="illustration-grid"></div>
-  </details>
-
   <div id="illustration-lightbox" class="illustration-lightbox" hidden>
     <button id="illustration-lightbox-close" type="button" class="illustration-lightbox-close" aria-label="Fermer">×</button>
     <img id="illustration-lightbox-img" alt="" />
@@ -62,6 +37,9 @@
     </button>
     <button id="tab-scratch" class="mode-tab" role="tab" aria-selected="false" type="button">
       Créer depuis un thème
+    </button>
+    <button id="tab-illustrations" class="mode-tab" role="tab" aria-selected="false" type="button">
+      Bibliothèque d'illustrations (<span id="illustration-count">0</span>)
     </button>
   </div>
 
@@ -284,6 +262,31 @@
     </div>
 
     <div id="scratch-summary" class="pix-summary" hidden></div>
+  </section>
+
+  <section id="mode-illustrations" class="mode-panel" hidden>
+    <p class="lead">
+      Alimentée automatiquement à chaque PPTX traité (n'importe quel mode) :
+      chaque illustration présente dans un fichier source est conservée ici
+      et réutilisée plus tard pour illustrer une diapositive qui n'en a pas
+      — stockée uniquement dans ce navigateur, jamais envoyée nulle part.
+      Cliquez sur une vignette pour l'agrandir.
+    </p>
+    <div class="illustration-actions">
+      <label class="illustration-import-label">
+        Ajouter des images
+        <input id="illustration-upload-input" type="file" accept="image/*" multiple hidden />
+      </label>
+      <button id="illustration-export-btn" type="button">Exporter (fichier .json)</button>
+      <button id="illustration-zip-btn" type="button">Télécharger tout (.zip)</button>
+      <label class="illustration-import-label">
+        Importer (fichier .json)
+        <input id="illustration-import-input" type="file" accept=".json" hidden />
+      </label>
+      <button id="illustration-cleanup-btn" type="button">Analyser les doublons</button>
+    </div>
+    <div id="illustration-cleanup-results"></div>
+    <div id="illustration-grid" class="illustration-grid"></div>
   </section>
 
   <div id="generation-fields">
