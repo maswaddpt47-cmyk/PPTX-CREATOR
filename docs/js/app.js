@@ -430,6 +430,7 @@
       targetMinutes,
       apiKey: scratchApiKeyInput.value.trim(),
       forceApi: scratchForceApiInput.checked,
+      onStatus: (text) => setStatus(text),
     });
 
     // Explicit, scannable flag for which content source this generation
