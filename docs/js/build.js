@@ -33,8 +33,13 @@
       keywords: ["confidentialite", "donnees", "prive", "vie", "securite"],
     },
     {
-      title: "France Services — accompagnement aux démarches numériques",
-      url: "france-services.gouv.fr",
+      // Département's own network, not the generic France Services
+      // reference — this tool is built for the Département's conseillers
+      // et médiateurs numériques, so any accompaniment-structure resource
+      // should point users to their local one, not a generic pointer to
+      // any France Services desk in the country.
+      title: "Conseillers et médiateurs numériques du Département (Lot-et-Garonne)",
+      url: "cartographie.societenumerique.gouv.fr/nouvelle-aquitaine/lot-et-garonne",
       keywords: ["accompagnement", "numerique", "administratif", "demarche", "service"],
     },
     {
