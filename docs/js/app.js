@@ -469,26 +469,30 @@
   const illustrationCountEl = document.getElementById("illustration-count");
   const illustrationGridEl = document.getElementById("illustration-grid");
   const illustrationPanel = document.getElementById("illustration-library-panel");
-  const illustrationViewGridBtn = document.getElementById("illustration-view-grid-btn");
-  const illustrationViewSlideshowBtn = document.getElementById("illustration-view-slideshow-btn");
-  const slideshowViewerEl = document.getElementById("slideshow-viewer");
-  const slideshowEmptyEl = document.getElementById("slideshow-empty");
-  const slideshowImageEl = document.getElementById("slideshow-image");
-  const slideshowLabelEl = document.getElementById("slideshow-label");
-  const slideshowCounterEl = document.getElementById("slideshow-counter");
-  const slideshowPrevBtn = document.getElementById("slideshow-prev");
-  const slideshowNextBtn = document.getElementById("slideshow-next");
-  const slideshowDownloadBtn = document.getElementById("slideshow-download");
-  const slideshowDeleteBtn = document.getElementById("slideshow-delete");
+  const illustrationLightboxEl = document.getElementById("illustration-lightbox");
+  const illustrationLightboxImgEl = document.getElementById("illustration-lightbox-img");
+  const illustrationLightboxLabelEl = document.getElementById("illustration-lightbox-label");
+  const illustrationLightboxCloseBtn = document.getElementById("illustration-lightbox-close");
 
-  /* "Vignettes" (grid, the original view) vs "Diaporama" (one image at a
-     time) — two ways to browse the same library, switchable in place
-     rather than split across separate tabs, so the export/import/upload
-     toolbar above stays available no matter which view is active. */
-  let illustrationView = "grid";
-  let slideshowEntries = [];
-  let slideshowIndex = 0;
-  let slideshowObjectUrl = null;
+  /* Click a thumbnail to see it larger — reuses the same object URL already
+     created for the thumbnail rather than decoding the image bytes again. */
+  function openLightbox(url, label) {
+    illustrationLightboxImgEl.src = url;
+    illustrationLightboxLabelEl.textContent = label;
+    illustrationLightboxEl.hidden = false;
+  }
+
+  function closeLightbox() {
+    illustrationLightboxEl.hidden = true;
+  }
+
+  illustrationLightboxCloseBtn.addEventListener("click", closeLightbox);
+  illustrationLightboxEl.addEventListener("click", (e) => {
+    if (e.target === illustrationLightboxEl) closeLightbox(); // click on the backdrop, not the image
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !illustrationLightboxEl.hidden) closeLightbox();
+  });
 
   /* Shared thumbnail card — used by the main grid and the cleanup review
      views below, so a "Supprimer" action always looks and behaves the
@@ -501,6 +505,7 @@
     item.className = "illustration-item";
     item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
     item.querySelector(".illustration-label").textContent = entry.label;
+    item.querySelector("img").addEventListener("click", () => openLightbox(url, entry.label));
 
     const actions = document.createElement("div");
     actions.className = "illustration-item-actions";
@@ -515,7 +520,10 @@
     return { item, blob };
   }
 
-  function renderIllustrationGrid(all) {
+  async function refreshIllustrationPanel() {
+    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
+    illustrationCountEl.textContent = all.length;
+    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
     illustrationGridEl.innerHTML = "";
     for (const entry of all) {
       const { item, blob } = buildIllustrationCard(entry, [
@@ -538,77 +546,8 @@
     }
   }
 
-  function renderSlideshowSlide(all) {
-    slideshowEntries = all;
-    if (slideshowIndex >= slideshowEntries.length) slideshowIndex = Math.max(0, slideshowEntries.length - 1);
-    const empty = slideshowEntries.length === 0;
-    slideshowViewerEl.hidden = empty;
-    slideshowEmptyEl.hidden = !empty;
-    if (empty) return;
-
-    if (slideshowObjectUrl) URL.revokeObjectURL(slideshowObjectUrl);
-    const entry = slideshowEntries[slideshowIndex];
-    const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
-    slideshowObjectUrl = URL.createObjectURL(blob);
-    slideshowImageEl.src = slideshowObjectUrl;
-    slideshowLabelEl.textContent = entry.label;
-    slideshowCounterEl.textContent = `${slideshowIndex + 1} / ${slideshowEntries.length}`;
-    slideshowPrevBtn.disabled = slideshowEntries.length < 2;
-    slideshowNextBtn.disabled = slideshowEntries.length < 2;
-  }
-
-  async function refreshIllustrationPanel() {
-    const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
-    illustrationCountEl.textContent = all.length;
-    illustrationGridEl.hidden = illustrationView !== "grid";
-    slideshowViewerEl.hidden = illustrationView !== "slideshow" || all.length === 0;
-    slideshowEmptyEl.hidden = illustrationView !== "slideshow" || all.length > 0;
-    if (!illustrationPanel.open) return; // avoid building object URLs while collapsed
-    if (illustrationView === "grid") renderIllustrationGrid(all);
-    else renderSlideshowSlide(all);
-  }
-
-  function setIllustrationView(view) {
-    illustrationView = view;
-    illustrationViewGridBtn.classList.toggle("active", view === "grid");
-    illustrationViewSlideshowBtn.classList.toggle("active", view === "slideshow");
-    refreshIllustrationPanel();
-  }
-
-  illustrationViewGridBtn.addEventListener("click", () => setIllustrationView("grid"));
-  illustrationViewSlideshowBtn.addEventListener("click", () => setIllustrationView("slideshow"));
-
   illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
   refreshIllustrationPanel();
-
-  function slideshowStep(delta) {
-    if (slideshowEntries.length < 2) return;
-    slideshowIndex = (slideshowIndex + delta + slideshowEntries.length) % slideshowEntries.length;
-    renderSlideshowSlide(slideshowEntries);
-  }
-
-  slideshowPrevBtn.addEventListener("click", () => slideshowStep(-1));
-  slideshowNextBtn.addEventListener("click", () => slideshowStep(1));
-
-  slideshowDownloadBtn.addEventListener("click", () => {
-    const entry = slideshowEntries[slideshowIndex];
-    if (!entry) return;
-    const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
-    triggerDownload(new Blob([entry.bytes]), `${safeName}.${entry.ext}`);
-  });
-
-  slideshowDeleteBtn.addEventListener("click", async () => {
-    const entry = slideshowEntries[slideshowIndex];
-    if (!entry) return;
-    await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-    await refreshIllustrationPanel();
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (!illustrationPanel.open || illustrationView !== "slideshow") return;
-    if (e.key === "ArrowLeft") slideshowStep(-1);
-    else if (e.key === "ArrowRight") slideshowStep(1);
-  });
 
   /* ---------- Illustration cleanup: exact + near-duplicate review ---------- */
 
