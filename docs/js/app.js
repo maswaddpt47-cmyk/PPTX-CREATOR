@@ -670,6 +670,7 @@
 
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
+    generateBtn.classList.add("generating");
     try {
       if (mode === "pptx") await generateFromPptx();
       else if (mode === "pix") await generateFromPix();
@@ -681,6 +682,7 @@
       console.error(err);
       setStatus(`Erreur : ${err.message}`, "error");
     } finally {
+      generateBtn.classList.remove("generating");
       refreshGenerateEnabled();
     }
   });
