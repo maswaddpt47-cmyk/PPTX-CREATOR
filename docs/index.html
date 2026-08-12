@@ -213,6 +213,15 @@
       <input id="scratch-theme" type="text" placeholder="ex. Créer une adresse email" />
     </div>
 
+    <details id="scratch-themes-panel" class="illustration-panel">
+      <summary>Thèmes déjà disponibles hors-ligne (<span id="scratch-themes-count">0</span>)</summary>
+      <p class="hint">
+        Si votre thème correspond à l'un de ceux-ci, le support est généré
+        sans appel réseau. Sinon, l'API Claude prend le relais (clé requise).
+      </p>
+      <ul id="scratch-themes-list"></ul>
+    </details>
+
     <div class="field">
       <label for="scratch-notes">Observations <span class="optional">— optionnel</span></label>
       <textarea id="scratch-notes" rows="3" placeholder="ex. public débutant, insister sur la sécurité, éviter le vocabulaire anglais…"></textarea>
