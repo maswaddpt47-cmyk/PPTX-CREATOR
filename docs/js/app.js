@@ -89,17 +89,21 @@
   const tabMerge = document.getElementById("tab-merge");
   const tabMulti = document.getElementById("tab-multi");
   const tabScratch = document.getElementById("tab-scratch");
+  const tabSlideshow = document.getElementById("tab-slideshow");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
   const modeMulti = document.getElementById("mode-multi");
   const modeScratch = document.getElementById("mode-scratch");
+  const modeSlideshow = document.getElementById("mode-slideshow");
+  const generationFieldsEl = document.getElementById("generation-fields");
   const tabs = [
     { key: "pptx", tab: tabPptx, panel: modePptx },
     { key: "pix", tab: tabPix, panel: modePix },
     { key: "merge", tab: tabMerge, panel: modeMerge },
     { key: "multi", tab: tabMulti, panel: modeMulti },
     { key: "scratch", tab: tabScratch, panel: modeScratch },
+    { key: "slideshow", tab: tabSlideshow, panel: modeSlideshow },
   ];
 
   let mode = "pptx";
@@ -109,7 +113,8 @@
     else if (mode === "pix") generateBtn.disabled = pixFiles.length === 0;
     else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
     else if (mode === "multi") generateBtn.disabled = multiFiles.length < 2;
-    else generateBtn.disabled = !scratchThemeInput.value.trim();
+    else if (mode === "scratch") generateBtn.disabled = !scratchThemeInput.value.trim();
+    else generateBtn.disabled = true; // slideshow: not a generation mode
   }
 
   function setMode(next) {
@@ -120,8 +125,14 @@
       t.tab.setAttribute("aria-selected", String(active));
       t.panel.hidden = !active;
     }
+    // The "titre"/"thematique"/generate button block only applies to the
+    // generation modes — the slideshow tab is a pure library browser, so
+    // hide it there rather than show a "Générer le PPTX" button that does
+    // nothing meaningful in this tab.
+    generationFieldsEl.hidden = mode === "slideshow";
     setStatus("");
     refreshGenerateEnabled();
+    if (mode === "slideshow") refreshSlideshow();
   }
 
   tabPptx.addEventListener("click", () => setMode("pptx"));
@@ -129,6 +140,7 @@
   tabMerge.addEventListener("click", () => setMode("merge"));
   tabMulti.addEventListener("click", () => setMode("multi"));
   tabScratch.addEventListener("click", () => setMode("scratch"));
+  tabSlideshow.addEventListener("click", () => setMode("slideshow"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
 
@@ -523,6 +535,78 @@
 
   illustrationPanel.addEventListener("toggle", refreshIllustrationPanel);
   refreshIllustrationPanel();
+
+  /* ---------- Slideshow tab: browse the library one image at a time ---------- */
+
+  const slideshowViewerEl = document.getElementById("slideshow-viewer");
+  const slideshowEmptyEl = document.getElementById("slideshow-empty");
+  const slideshowImageEl = document.getElementById("slideshow-image");
+  const slideshowLabelEl = document.getElementById("slideshow-label");
+  const slideshowCounterEl = document.getElementById("slideshow-counter");
+  const slideshowPrevBtn = document.getElementById("slideshow-prev");
+  const slideshowNextBtn = document.getElementById("slideshow-next");
+  const slideshowDownloadBtn = document.getElementById("slideshow-download");
+  const slideshowDeleteBtn = document.getElementById("slideshow-delete");
+
+  let slideshowEntries = [];
+  let slideshowIndex = 0;
+  let slideshowObjectUrl = null;
+
+  function renderSlideshowSlide() {
+    const empty = slideshowEntries.length === 0;
+    slideshowViewerEl.hidden = empty;
+    slideshowEmptyEl.hidden = !empty;
+    if (empty) return;
+
+    if (slideshowObjectUrl) URL.revokeObjectURL(slideshowObjectUrl);
+    const entry = slideshowEntries[slideshowIndex];
+    const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
+    slideshowObjectUrl = URL.createObjectURL(blob);
+    slideshowImageEl.src = slideshowObjectUrl;
+    slideshowLabelEl.textContent = entry.label;
+    slideshowCounterEl.textContent = `${slideshowIndex + 1} / ${slideshowEntries.length}`;
+    slideshowPrevBtn.disabled = slideshowEntries.length < 2;
+    slideshowNextBtn.disabled = slideshowEntries.length < 2;
+  }
+
+  /* Reloads from IndexedDB every time the tab is opened, so illustrations
+     added/removed elsewhere (upload, import, cleanup, or this tab's own
+     "Supprimer") are always reflected rather than showing a stale list. */
+  async function refreshSlideshow() {
+    slideshowEntries = await window.PG_ILLUSTRATIONS.getAllIllustrations();
+    if (slideshowIndex >= slideshowEntries.length) slideshowIndex = Math.max(0, slideshowEntries.length - 1);
+    renderSlideshowSlide();
+  }
+
+  function slideshowStep(delta) {
+    if (slideshowEntries.length < 2) return;
+    slideshowIndex = (slideshowIndex + delta + slideshowEntries.length) % slideshowEntries.length;
+    renderSlideshowSlide();
+  }
+
+  slideshowPrevBtn.addEventListener("click", () => slideshowStep(-1));
+  slideshowNextBtn.addEventListener("click", () => slideshowStep(1));
+
+  slideshowDownloadBtn.addEventListener("click", () => {
+    const entry = slideshowEntries[slideshowIndex];
+    if (!entry) return;
+    const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+    triggerDownload(new Blob([entry.bytes]), `${safeName}.${entry.ext}`);
+  });
+
+  slideshowDeleteBtn.addEventListener("click", async () => {
+    const entry = slideshowEntries[slideshowIndex];
+    if (!entry) return;
+    await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+    await refreshSlideshow();
+    await refreshIllustrationPanel();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (mode !== "slideshow") return;
+    if (e.key === "ArrowLeft") slideshowStep(-1);
+    else if (e.key === "ArrowRight") slideshowStep(1);
+  });
 
   /* ---------- Illustration cleanup: exact + near-duplicate review ---------- */
 
