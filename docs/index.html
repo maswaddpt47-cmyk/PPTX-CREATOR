@@ -37,33 +37,15 @@
       </label>
       <button id="illustration-cleanup-btn" type="button">Analyser les doublons</button>
     </div>
-    <div class="illustration-view-toggle" role="group" aria-label="Mode d'affichage">
-      <button id="illustration-view-grid-btn" type="button" class="view-toggle-btn active">Vignettes</button>
-      <button id="illustration-view-slideshow-btn" type="button" class="view-toggle-btn">Diaporama</button>
-    </div>
     <div id="illustration-cleanup-results"></div>
     <div id="illustration-grid" class="illustration-grid"></div>
-    <div id="slideshow-viewer" class="slideshow-viewer" hidden>
-      <div class="slideshow-stage">
-        <button id="slideshow-prev" type="button" class="slideshow-nav" aria-label="Illustration précédente">‹</button>
-        <div class="slideshow-image-wrap">
-          <img id="slideshow-image" alt="" />
-        </div>
-        <button id="slideshow-next" type="button" class="slideshow-nav" aria-label="Illustration suivante">›</button>
-      </div>
-      <div class="slideshow-meta">
-        <span id="slideshow-label" class="slideshow-label"></span>
-        <span id="slideshow-counter" class="slideshow-counter"></span>
-      </div>
-      <div class="slideshow-actions">
-        <button id="slideshow-download" type="button">Télécharger</button>
-        <button id="slideshow-delete" type="button">Supprimer</button>
-      </div>
-    </div>
-    <p id="slideshow-empty" class="hint" hidden>
-      La bibliothèque est vide — ajoutez des illustrations ci-dessus.
-    </p>
   </details>
+
+  <div id="illustration-lightbox" class="illustration-lightbox" hidden>
+    <button id="illustration-lightbox-close" type="button" class="illustration-lightbox-close" aria-label="Fermer">×</button>
+    <img id="illustration-lightbox-img" alt="" />
+    <div id="illustration-lightbox-label" class="illustration-lightbox-label"></div>
+  </div>
 
   <div class="mode-tabs" role="tablist">
     <button id="tab-pptx" class="mode-tab active" role="tab" aria-selected="true" type="button">
