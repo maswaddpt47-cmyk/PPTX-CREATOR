@@ -268,6 +268,25 @@ h1 {
   color: var(--red);
 }
 
+.source-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+}
+
+.source-badge-pix {
+  background: #EEF3D8;
+  color: #5A6512;
+}
+
+.source-badge-api {
+  background: #FDECEA;
+  color: var(--red);
+}
+
 .field {
   margin-top: 1.75rem;
 }

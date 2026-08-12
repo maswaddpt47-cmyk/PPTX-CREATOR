@@ -392,10 +392,18 @@
   const scratchMinutesPerSlideEl = document.getElementById("scratch-minutes-per-slide");
   const scratchApiKeyInput = document.getElementById("scratch-api-key");
   const scratchSummaryEl = document.getElementById("scratch-summary");
+  const scratchThemesCountEl = document.getElementById("scratch-themes-count");
+  const scratchThemesListEl = document.getElementById("scratch-themes-list");
 
   scratchTargetMinutesEl.value = window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
   scratchMinutesPerSlideEl.textContent = window.PG_SCRATCH_BUILD.MINUTES_PER_SLIDE;
   scratchApiKeyInput.value = window.PG_SCRATCH_BUILD.getStoredApiKey();
+
+  const { THEMES: PIX_THEME_LIST } = window.PG_PIX_THEMES;
+  scratchThemesCountEl.textContent = PIX_THEME_LIST.length;
+  scratchThemesListEl.innerHTML = PIX_THEME_LIST.map(
+    (t) => `<li><strong>${t.heading}</strong> — ${t.programmeBody}</li>`
+  ).join("");
 
   scratchThemeInput.addEventListener("input", () => {
     setStatus("");
@@ -409,7 +417,7 @@
 
   async function generateFromScratch() {
     const theme = scratchThemeInput.value.trim();
-    setStatus(`Recherche du thème "${theme}" dans la bibliothèque hors-ligne…`);
+    setStatus(`Recherche du thème "${theme}" dans la bibliothèque PIX…`);
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const targetMinutes = parseInt(scratchTargetMinutesEl.value, 10) || window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
 
@@ -422,19 +430,22 @@
       apiKey: scratchApiKeyInput.value.trim(),
     });
 
-    scratchSummaryEl.innerHTML =
+    // Explicit, scannable flag for which content source this generation
+    // actually used — the badge class alone (pix vs api) answers "est-ce
+    // qu'il y a eu appel à l'API" without having to read the sentence.
+    const badgeClass = source === "curated" ? "source-badge-pix" : "source-badge-api";
+    const badgeText = source === "curated" ? "Source : bibliothèque PIX" : "Source : API Claude";
+    const detail =
       source === "curated"
-        ? `<strong>Contenu trouvé dans la bibliothèque hors-ligne</strong> (thème « ${themeHeading} ») — aucun appel réseau.`
-        : `<strong>Contenu généré par l'API Claude</strong> (${slideCount} diapositive(s) de contenu) — aucun thème correspondant n'a été trouvé dans la bibliothèque hors-ligne.`;
+        ? `Thème « ${themeHeading} » trouvé dans la bibliothèque PIX — aucun appel réseau.`
+        : `Aucun thème PIX ne correspondait à "${theme}" — contenu généré par l'API Claude (${slideCount} diapositive(s) de contenu).`;
+    scratchSummaryEl.innerHTML = `<span class="source-badge ${badgeClass}">${badgeText}</span><p>${detail}</p>`;
     scratchSummaryEl.hidden = false;
 
     const outName = (titreInput.value.trim() || theme || "atelier") + " - mis en forme.pptx";
     triggerDownload(blob, outName);
     setStatus(
-      `Livrable généré : ${outName}\n` +
-        (source === "curated"
-          ? `Contenu issu de la bibliothèque hors-ligne (thème « ${themeHeading} »).`
-          : `Contenu généré par l'API Claude (${slideCount} diapositive(s) de contenu).`) +
+      `Livrable généré : ${outName}\n${badgeText} — ${detail}` +
         "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
       "success"
     );
