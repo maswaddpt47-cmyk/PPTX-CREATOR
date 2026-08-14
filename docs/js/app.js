@@ -742,12 +742,12 @@
     if (nearPairs.length) {
       const section = document.createElement("div");
       section.className = "cleanup-section";
-      section.innerHTML = `<h3>Quasi-doublons à vérifier (contenu textuel très proche)</h3>
-        <p class="hint">Les images sont différentes mais le titre/contenu se ressemble beaucoup — à toi de juger si ce sont deux illustrations distinctes à garder, ou un doublon à nettoyer.</p>`;
+      section.innerHTML = `<h3>Quasi-doublons à vérifier (images visuellement très proches)</h3>
+        <p class="hint">Ces images se ressemblent visuellement sans être identiques (recadrage, compression...) — à toi de juger si ce sont deux illustrations distinctes à garder, ou un doublon à nettoyer.</p>`;
       for (const { score, a, b } of nearPairs) {
         const pairEl = document.createElement("div");
         pairEl.className = "cleanup-pair";
-        pairEl.innerHTML = `<div class="cleanup-pair-score">Similarité de contenu : ${Math.round(score * 100)}%</div>`;
+        pairEl.innerHTML = `<div class="cleanup-pair-score">Similarité visuelle : ${Math.round(score * 100)}%</div>`;
         const grid = document.createElement("div");
         grid.className = "illustration-grid";
         for (const entry of [a, b]) {
