@@ -538,6 +538,9 @@
   const illustrationLightboxImgEl = document.getElementById("illustration-lightbox-img");
   const illustrationLightboxLabelEl = document.getElementById("illustration-lightbox-label");
   const illustrationLightboxCloseBtn = document.getElementById("illustration-lightbox-close");
+  const illustrationSelectAllCheckbox = document.getElementById("illustration-select-all");
+  const illustrationDeleteSelectedBtn = document.getElementById("illustration-delete-selected-btn");
+  const illustrationSelectedCountEl = document.getElementById("illustration-selected-count");
 
   /* Click a thumbnail to see it larger — reuses the same object URL already
      created for the thumbnail rather than decoding the image bytes again. */
@@ -559,18 +562,70 @@
     if (e.key === "Escape" && !illustrationLightboxEl.hidden) closeLightbox();
   });
 
+  // Ids checked in the main grid for bulk delete — a real need once the
+  // library grows into dozens of near-duplicates (e.g. after extracting
+  // from several similar source decks) and deleting one at a time isn't
+  // practical anymore. Scoped to the main grid only, not the cleanup-scan
+  // review cards below, which already have their own one-click actions.
+  const selectedIds = new Set();
+
+  function updateBulkBar() {
+    illustrationSelectedCountEl.textContent = selectedIds.size;
+    illustrationDeleteSelectedBtn.disabled = selectedIds.size === 0;
+    const total = illustrationGridEl.querySelectorAll(".illustration-select").length;
+    illustrationSelectAllCheckbox.checked = total > 0 && selectedIds.size === total;
+    illustrationSelectAllCheckbox.indeterminate = selectedIds.size > 0 && selectedIds.size < total;
+  }
+
+  illustrationSelectAllCheckbox.addEventListener("change", () => {
+    const checked = illustrationSelectAllCheckbox.checked;
+    illustrationGridEl.querySelectorAll(".illustration-select").forEach((cb) => {
+      cb.checked = checked;
+      const id = Number(cb.dataset.id);
+      if (checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+    });
+    updateBulkBar();
+  });
+
+  illustrationDeleteSelectedBtn.addEventListener("click", async () => {
+    if (!selectedIds.size) return;
+    if (!confirm(`Supprimer définitivement ${selectedIds.size} illustration(s) ?`)) return;
+    for (const id of selectedIds) await window.PG_ILLUSTRATIONS.deleteIllustration(id);
+    await refreshIllustrationPanel();
+  });
+
   /* Shared thumbnail card — used by the main grid and the cleanup review
      views below, so a "Supprimer" action always looks and behaves the
      same regardless of where it's clicked from. `buttons` is an array of
-     { label, onClick } rendered as the item's action row, in order. */
-  function buildIllustrationCard(entry, buttons) {
+     { label, onClick } rendered as the item's action row, in order.
+     `selectable` adds the bulk-delete checkbox — only the main grid wants
+     it, not the cleanup-review cards, which already carry their own
+     per-item action. */
+  function buildIllustrationCard(entry, buttons, { selectable = false } = {}) {
     const blob = new Blob([entry.bytes], { type: `image/${entry.ext === "jpg" ? "jpeg" : entry.ext}` });
     const url = URL.createObjectURL(blob);
     const item = document.createElement("div");
     item.className = "illustration-item";
-    item.innerHTML = `<img src="${url}" alt="" /><div class="illustration-label"></div>`;
+    item.innerHTML =
+      `<div class="illustration-thumb"><img src="${url}" alt="" /></div><div class="illustration-label"></div>`;
     item.querySelector(".illustration-label").textContent = entry.label;
     item.querySelector("img").addEventListener("click", () => openLightbox(url, entry.label));
+
+    if (selectable) {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "illustration-select";
+      checkbox.dataset.id = entry.id;
+      checkbox.checked = selectedIds.has(entry.id);
+      checkbox.addEventListener("click", (e) => e.stopPropagation()); // don't also open the lightbox
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) selectedIds.add(entry.id);
+        else selectedIds.delete(entry.id);
+        updateBulkBar();
+      });
+      item.querySelector(".illustration-thumb").prepend(checkbox);
+    }
 
     const actions = document.createElement("div");
     actions.className = "illustration-item-actions";
@@ -589,26 +644,32 @@
     const all = await window.PG_ILLUSTRATIONS.getAllIllustrations();
     illustrationCountEl.textContent = all.length;
     if (mode !== "illustrations") return; // avoid building object URLs while the tab isn't active
+    selectedIds.clear();
     illustrationGridEl.innerHTML = "";
     for (const entry of all) {
-      const { item, blob } = buildIllustrationCard(entry, [
-        {
-          label: "Télécharger",
-          onClick: () => {
-            const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
-            triggerDownload(blob, `${safeName}.${entry.ext}`);
+      const { item, blob } = buildIllustrationCard(
+        entry,
+        [
+          {
+            label: "Télécharger",
+            onClick: () => {
+              const safeName = (entry.label || "illustration").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+              triggerDownload(blob, `${safeName}.${entry.ext}`);
+            },
           },
-        },
-        {
-          label: "Supprimer",
-          onClick: async () => {
-            await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-            refreshIllustrationPanel();
+          {
+            label: "Supprimer",
+            onClick: async () => {
+              await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+              refreshIllustrationPanel();
+            },
           },
-        },
-      ]);
+        ],
+        { selectable: true }
+      );
       illustrationGridEl.appendChild(item);
     }
+    updateBulkBar();
   }
 
   refreshIllustrationPanel();
