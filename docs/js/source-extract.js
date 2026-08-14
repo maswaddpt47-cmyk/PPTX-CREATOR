@@ -286,18 +286,29 @@
     return { bytes, ext, mediaPath };
   }
 
+  // Raster formats a browser can actually decode in an <img> tag. PowerPoint
+  // decks commonly embed EMF/WMF (Windows vector metafiles — icons, simple
+  // diagrams, pasted clip art) as regular <p:pic> shapes above the size
+  // floor below; a browser can't render those at all, so they'd land in the
+  // library as a blank/black tile — confirmed in production: several such
+  // "empty cartouche"-looking entries after extracting from a real deck,
+  // exactly the kind of empty box the library is meant never to collect.
+  const RENDERABLE_IMAGE_EXT = new Set(["png", "jpg", "jpeg", "jpe", "jfif", "gif", "webp", "bmp", "svg"]);
+
   /* Standalone "just pull the pictures out" pass, independent of
      extractSourceModel()'s title/programme/content-slide structure — a
      dedicated "extract the illustrations from this PPTX" tab has no reason
      to require the 3-slide-minimum, first-slide-is-a-title-page shape that
      mode expects, since the source deck may not follow that convention at
      all. Every picture above the same size floor extractSlideContent() uses
-     (skips small per-item icons/logos) is added to the persistent library,
-     one entry per distinct underlying image — a decorative asset reused
-     across many slides (same media part, different per-slide rId) is only
-     added once. Returns { total, added, skipped } — added/skipped mirror
-     addIllustration()'s own label+size dedup against what was already in
-     the library before this run. */
+     (skips small per-item icons/logos), in a browser-renderable format, is
+     added to the persistent library, one entry per distinct underlying
+     image — a decorative asset reused across many slides (same media part,
+     different per-slide rId) is only added once. Returns
+     { total, added, skipped } — added/skipped mirror addIllustration()'s own
+     label+size dedup against what was already in the library before this
+     run (pictures skipped for being an unsupported format aren't counted in
+     either — they were never real candidates). */
   async function extractAllIllustrations(pkg) {
     const slideNums = pkg
       .listFiles()
@@ -327,6 +338,7 @@
         const image = await resolveSlideImage(pkg, num, pic.blipRid);
         if (!image || seenMediaPaths.has(image.mediaPath)) continue;
         seenMediaPaths.add(image.mediaPath);
+        if (!RENDERABLE_IMAGE_EXT.has(image.ext.toLowerCase())) continue;
         total++;
         if (!window.PG_ILLUSTRATIONS) continue;
         const before = (await window.PG_ILLUSTRATIONS.getAllIllustrations()).length;
