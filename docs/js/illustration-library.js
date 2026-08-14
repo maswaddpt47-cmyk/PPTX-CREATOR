@@ -20,8 +20,6 @@
 (function (global) {
   "use strict";
 
-  const { tokenize } = window.PG_SOURCE;
-
   const DB_NAME = "pg-illustration-library";
   const DB_VERSION = 1;
   const STORE = "illustrations";
@@ -126,13 +124,6 @@
     return { total: entries.length, imported, skipped: entries.length - imported };
   }
 
-  function jaccard(setA, setB) {
-    let inter = 0;
-    for (const t of setA) if (setB.has(t)) inter++;
-    const union = setA.size + setB.size - inter;
-    return union > 0 ? inter / union : 0;
-  }
-
   /* Random pick from the whole library, treated as one undifferentiated
      ambiance pool — see the file header for why this replaced a
      similarity-based match. excludeIds: entries already picked for an
@@ -154,21 +145,108 @@
     return true;
   }
 
-  // "Are these two library entries essentially the same content" is a much
-  // stronger claim than illustrating a slide ever needed, hence the high bar.
-  const NEAR_DUPLICATE_THRESHOLD = 0.5;
+  // 8x8 average hash ("aHash"): downscale to 64 grayscale pixels, compare
+  // each to the mean, one bit per pixel. Crude compared to a real
+  // perceptual hash, but cheap, dependency-free, and enough to tell "two
+  // photos of different scenes" apart — which is the actual bar here.
+  const HASH_SIZE = 8;
+  const HASH_BITS = HASH_SIZE * HASH_SIZE;
+
+  /* Confirmed in production: comparing the stored *text* (slide title/body)
+     instead of the image itself flagged completely unrelated illustrations
+     as "quasi-doublons" just because they came from similarly-titled slides
+     (e.g. a whole "Budget et numérique" section, each sub-slide's own photo
+     paired against every other one). Hashing actual pixel content fixes
+     that at the root — two visually different photos won't collide no
+     matter how similar their source slide's wording was.
+
+     Returns { hash, avgColor } — avgColor is a second, independent check
+     (see NEAR_DUPLICATE_MAX_COLOR_DISTANCE below): an average hash only
+     encodes which pixels are lighter/darker than the image's OWN mean, so
+     any flat, near-uniform image (a solid-color background, a simple
+     pictogram) degenerates toward the same "no contrast" hash regardless
+     of its actual color — confirmed while testing this fix, two solid
+     blocks of clearly different colors (red vs blue) hashed identically.
+     Comparing the mean color too catches exactly that case. */
+  async function computeAverageHash(bytes, ext) {
+    try {
+      const blob = new Blob([bytes], { type: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement("canvas");
+      canvas.width = HASH_SIZE;
+      canvas.height = HASH_SIZE;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(bitmap, 0, 0, HASH_SIZE, HASH_SIZE);
+      const { data } = ctx.getImageData(0, 0, HASH_SIZE, HASH_SIZE);
+      const luminance = new Array(HASH_BITS);
+      let sumLum = 0;
+      let sumR = 0,
+        sumG = 0,
+        sumB = 0;
+      for (let i = 0; i < HASH_BITS; i++) {
+        const o = i * 4;
+        const r = data[o],
+          g = data[o + 1],
+          b = data[o + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        luminance[i] = lum;
+        sumLum += lum;
+        sumR += r;
+        sumG += g;
+        sumB += b;
+      }
+      const avgLum = sumLum / HASH_BITS;
+      let hash = 0n;
+      for (let i = 0; i < HASH_BITS; i++) {
+        hash = (hash << 1n) | (luminance[i] > avgLum ? 1n : 0n);
+      }
+      const avgColor = [sumR / HASH_BITS, sumG / HASH_BITS, sumB / HASH_BITS];
+      return { hash, avgColor };
+    } catch {
+      // Unrenderable/corrupt image data — exclude from the near-duplicate
+      // comparison rather than fail the whole scan over one bad entry.
+      return null;
+    }
+  }
+
+  function hammingDistance(a, b) {
+    let x = a ^ b;
+    let count = 0;
+    while (x > 0n) {
+      count += Number(x & 1n);
+      x >>= 1n;
+    }
+    return count;
+  }
+
+  function colorDistance(c1, c2) {
+    const dr = c1[0] - c2[0],
+      dg = c1[1] - c2[1],
+      db = c1[2] - c2[2];
+    return Math.sqrt(dr * dr + dg * dg + db * db);
+  }
+
+  // Max Euclidean distance in 0-255 RGB space (~441.7) between two entries'
+  // mean colors to still count as a near-duplicate — a generous bar (real
+  // near-duplicates should be far closer than this), just enough to reject
+  // the "different flat colors, same degenerate structural hash" case above.
+  const NEAR_DUPLICATE_MAX_COLOR_DISTANCE = 40;
+
+  // Out of 64 bits: how many may differ before two images stop counting as
+  // "near duplicates." Conservative on purpose — false positives (flagging
+  // genuinely different photos) are the exact complaint this replaced.
+  const NEAR_DUPLICATE_MAX_DISTANCE = 5;
+  const NEAR_DUPLICATE_THRESHOLD = (HASH_BITS - NEAR_DUPLICATE_MAX_DISTANCE) / HASH_BITS;
 
   /* Two-tier duplicate scan over the whole library:
      - exactGroups: entries with byte-for-byte identical image data (bucketed
        by length first, then compared directly — no hashing, so zero
        collision risk on a library this size). Unambiguous: safe to
        auto-suggest deleting all but one per group.
-     - nearPairs: entries whose stored text (title+intro+items) is highly
-       similar by the Jaccard measure above, sorted by score descending.
-       NOT auto-deletable —
-       two different slides can legitimately share most of their wording
-       (e.g. two "créer votre mot de passe" sections) while carrying
-       different, both-worth-keeping photos, so this tier is surfaced for
+     - nearPairs: entries whose actual image content hashes to within
+       NEAR_DUPLICATE_MAX_DISTANCE bits of each other, sorted by similarity
+       descending. NOT auto-deletable — two crops/edits of the same photo
+       can legitimately both be worth keeping, so this tier is surfaced for
        a human to review side by side, never removed automatically. */
   async function findDuplicateGroups() {
     const all = await getAllIllustrations();
@@ -199,14 +277,19 @@
       }
     }
 
-    const tokensById = new Map(all.map((e) => [e.id, new Set(tokenize(e.text))]));
+    const hashed = await Promise.all(all.map((e) => computeAverageHash(e.bytes, e.ext)));
     const nearPairs = [];
     for (let i = 0; i < all.length; i++) {
+      if (hashed[i] == null) continue;
       for (let j = i + 1; j < all.length; j++) {
-        const a = all[i],
-          b = all[j];
-        const score = jaccard(tokensById.get(a.id), tokensById.get(b.id));
-        if (score >= NEAR_DUPLICATE_THRESHOLD) nearPairs.push({ score, a, b });
+        if (hashed[j] == null) continue;
+        const distance = hammingDistance(hashed[i].hash, hashed[j].hash);
+        if (
+          distance <= NEAR_DUPLICATE_MAX_DISTANCE &&
+          colorDistance(hashed[i].avgColor, hashed[j].avgColor) <= NEAR_DUPLICATE_MAX_COLOR_DISTANCE
+        ) {
+          nearPairs.push({ score: (HASH_BITS - distance) / HASH_BITS, a: all[i], b: all[j] });
+        }
       }
     }
     nearPairs.sort((x, y) => y.score - x.score);
