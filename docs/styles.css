@@ -396,7 +396,8 @@ h1 {
   line-height: 1.4;
 }
 
-button#generate-btn {
+button#generate-btn,
+button#extract-btn {
   margin-top: 2rem;
   background: var(--blue);
   color: #fff;
@@ -409,12 +410,14 @@ button#generate-btn {
   cursor: pointer;
 }
 
-button#generate-btn:disabled {
+button#generate-btn:disabled,
+button#extract-btn:disabled {
   background: #A9B8C2;
   cursor: not-allowed;
 }
 
-button#generate-btn:not(:disabled):hover {
+button#generate-btn:not(:disabled):hover,
+button#extract-btn:not(:disabled):hover {
   background: var(--blue-light);
 }
 
