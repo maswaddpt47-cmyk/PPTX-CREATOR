@@ -593,6 +593,10 @@
     if (!confirm(`Supprimer définitivement ${selectedIds.size} illustration(s) ?`)) return;
     for (const id of selectedIds) await window.PG_ILLUSTRATIONS.deleteIllustration(id);
     await refreshIllustrationPanel();
+    // Selection can include entries checked from the duplicate-review cards
+    // (exact groups / near-pairs) below the main grid — re-run the scan too
+    // if it's currently showing something, so deleted entries don't linger.
+    if (illustrationCleanupResultsEl.innerHTML.trim()) await runIllustrationCleanupScan();
   });
 
   /* Shared thumbnail card — used by the main grid and the cleanup review
@@ -719,17 +723,23 @@
         grid.className = "illustration-grid";
         for (const entry of group) {
           const isKept = entry === keep;
-          const { item } = buildIllustrationCard(entry, [
-            {
-              label: isKept ? "Conservée" : "Supprimer",
-              onClick: async () => {
-                if (isKept) return;
-                await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-                await refreshIllustrationPanel();
-                await runIllustrationCleanupScan();
+          const { item } = buildIllustrationCard(
+            entry,
+            [
+              {
+                label: isKept ? "Conservée" : "Supprimer",
+                onClick: async () => {
+                  if (isKept) return;
+                  await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+                  await refreshIllustrationPanel();
+                  await runIllustrationCleanupScan();
+                },
               },
-            },
-          ]);
+            ],
+            // Not selectable when kept — the checkbox would contradict its
+            // own "Conservée" label right next to it.
+            { selectable: !isKept }
+          );
           if (isKept) item.classList.add("cleanup-kept");
           grid.appendChild(item);
         }
@@ -751,16 +761,20 @@
         const grid = document.createElement("div");
         grid.className = "illustration-grid";
         for (const entry of [a, b]) {
-          const { item } = buildIllustrationCard(entry, [
-            {
-              label: "Supprimer celle-ci",
-              onClick: async () => {
-                await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
-                await refreshIllustrationPanel();
-                await runIllustrationCleanupScan();
+          const { item } = buildIllustrationCard(
+            entry,
+            [
+              {
+                label: "Supprimer celle-ci",
+                onClick: async () => {
+                  await window.PG_ILLUSTRATIONS.deleteIllustration(entry.id);
+                  await refreshIllustrationPanel();
+                  await runIllustrationCleanupScan();
+                },
               },
-            },
-          ]);
+            ],
+            { selectable: true }
+          );
           grid.appendChild(item);
         }
         pairEl.appendChild(grid);
@@ -768,6 +782,7 @@
       }
       illustrationCleanupResultsEl.appendChild(section);
     }
+    updateBulkBar();
   }
 
   illustrationCleanupBtn.addEventListener("click", runIllustrationCleanupScan);
