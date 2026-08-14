@@ -267,7 +267,11 @@
 
   /* Resolve a slide-local blip rId to raw image bytes + extension via that
      slide's own .rels file (rels Targets are relative to ppt/slides/, the
-     directory of the slide part itself — not its _rels subfolder). */
+     directory of the slide part itself — not its _rels subfolder). Also
+     returns the resolved media part path — the same physical image can be
+     referenced by a different rId on every slide it appears on (e.g. a
+     reused decorative asset), so callers that want to dedup across a whole
+     deck need something more stable than the per-slide rId. */
   async function resolveSlideImage(pkg, slideNum, rid) {
     if (!rid) return null;
     const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
@@ -279,7 +283,65 @@
     if (!pkg.has(mediaPath)) return null;
     const bytes = await pkg.bytes(mediaPath);
     const ext = mediaPath.split(".").pop().toLowerCase();
-    return { bytes, ext };
+    return { bytes, ext, mediaPath };
+  }
+
+  /* Standalone "just pull the pictures out" pass, independent of
+     extractSourceModel()'s title/programme/content-slide structure — a
+     dedicated "extract the illustrations from this PPTX" tab has no reason
+     to require the 3-slide-minimum, first-slide-is-a-title-page shape that
+     mode expects, since the source deck may not follow that convention at
+     all. Every picture above the same size floor extractSlideContent() uses
+     (skips small per-item icons/logos) is added to the persistent library,
+     one entry per distinct underlying image — a decorative asset reused
+     across many slides (same media part, different per-slide rId) is only
+     added once. Returns { total, added, skipped } — added/skipped mirror
+     addIllustration()'s own label+size dedup against what was already in
+     the library before this run. */
+  async function extractAllIllustrations(pkg) {
+    const slideNums = pkg
+      .listFiles()
+      .map((f) => f.match(/^ppt\/slides\/slide(\d+)\.xml$/))
+      .filter(Boolean)
+      .map((m) => parseInt(m[1], 10))
+      .sort((a, b) => a - b);
+
+    const ILLUSTRATION_MIN = 1200000; // same floor as extractSlideContent()
+    const seenMediaPaths = new Set();
+    let total = 0;
+    let added = 0;
+
+    for (const num of slideNums) {
+      const doc = await pkg.readXml(`ppt/slides/slide${num}.xml`);
+      const shapes = readShapes(doc);
+      const titleShape = shapes.find((s) => s.text);
+      const slideLabel = titleShape ? titleShape.text : `Illustration diapositive ${num}`;
+      const slideText = shapes
+        .filter((s) => s.text)
+        .map((s) => s.text)
+        .join(" ");
+      const pics = shapes.filter(
+        (s) => s.kind === "pic" && s.blipRid && s.pos && s.pos.cx >= ILLUSTRATION_MIN && s.pos.cy >= ILLUSTRATION_MIN
+      );
+      for (const pic of pics) {
+        const image = await resolveSlideImage(pkg, num, pic.blipRid);
+        if (!image || seenMediaPaths.has(image.mediaPath)) continue;
+        seenMediaPaths.add(image.mediaPath);
+        total++;
+        if (!window.PG_ILLUSTRATIONS) continue;
+        const before = (await window.PG_ILLUSTRATIONS.getAllIllustrations()).length;
+        await window.PG_ILLUSTRATIONS.addIllustration({
+          label: slideLabel,
+          text: slideText,
+          bytes: image.bytes,
+          ext: image.ext,
+        });
+        const after = (await window.PG_ILLUSTRATIONS.getAllIllustrations()).length;
+        if (after > before) added++;
+      }
+    }
+
+    return { total, added, skipped: total - added };
   }
 
   const CLOSING_KEYWORDS = ["recapitulat", "conclusion", "resume", "bilan"];
@@ -386,5 +448,5 @@
     return { title, programme, contentSlides, closing, tokenize };
   }
 
-  global.PG_SOURCE = { extractSourceModel, tokenize, readShapes, pairItems };
+  global.PG_SOURCE = { extractSourceModel, extractAllIllustrations, tokenize, readShapes, pairItems };
 })(window);

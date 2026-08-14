@@ -38,6 +38,9 @@
     <button id="tab-scratch" class="mode-tab" role="tab" aria-selected="false" type="button">
       Créer depuis un thème
     </button>
+    <button id="tab-extract" class="mode-tab" role="tab" aria-selected="false" type="button">
+      Extraire les illustrations d'un PPTX
+    </button>
     <button id="tab-illustrations" class="mode-tab" role="tab" aria-selected="false" type="button">
       Bibliothèque d'illustrations (<span id="illustration-count">0</span>)
     </button>
@@ -262,6 +265,25 @@
     </div>
 
     <div id="scratch-summary" class="pix-summary" hidden></div>
+  </section>
+
+  <section id="mode-extract" class="mode-panel" hidden>
+    <p class="lead">
+      Déposez un PPTX pour n'en récupérer que les illustrations, sans
+      générer de support — chaque image ajoutée à la bibliothèque
+      persistante, prête à réutiliser ailleurs dans l'app. Fonctionne sur
+      n'importe quel PPTX, pas seulement ceux au format "atelier" attendu
+      par les autres modes.
+    </p>
+    <section id="extract-dropzone" class="dropzone" tabindex="0">
+      <div class="dropzone-inner">
+        <p class="dropzone-title">Glissez un fichier .pptx ici</p>
+        <p class="dropzone-sub">ou cliquez pour sélectionner un fichier</p>
+        <p id="extract-file-name" class="file-name"></p>
+      </div>
+      <input id="extract-file-input" type="file" accept=".pptx" hidden />
+    </section>
+    <button id="extract-btn" type="button" disabled>Extraire les illustrations</button>
   </section>
 
   <section id="mode-illustrations" class="mode-panel" hidden>

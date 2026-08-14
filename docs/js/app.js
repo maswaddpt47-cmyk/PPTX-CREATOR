@@ -89,12 +89,14 @@
   const tabMerge = document.getElementById("tab-merge");
   const tabMulti = document.getElementById("tab-multi");
   const tabScratch = document.getElementById("tab-scratch");
+  const tabExtract = document.getElementById("tab-extract");
   const tabIllustrations = document.getElementById("tab-illustrations");
   const modePptx = document.getElementById("mode-pptx");
   const modePix = document.getElementById("mode-pix");
   const modeMerge = document.getElementById("mode-merge");
   const modeMulti = document.getElementById("mode-multi");
   const modeScratch = document.getElementById("mode-scratch");
+  const modeExtract = document.getElementById("mode-extract");
   const modeIllustrations = document.getElementById("mode-illustrations");
   const generationFieldsEl = document.getElementById("generation-fields");
   const tabs = [
@@ -103,8 +105,11 @@
     { key: "merge", tab: tabMerge, panel: modeMerge },
     { key: "multi", tab: tabMulti, panel: modeMulti },
     { key: "scratch", tab: tabScratch, panel: modeScratch },
+    { key: "extract", tab: tabExtract, panel: modeExtract },
     { key: "illustrations", tab: tabIllustrations, panel: modeIllustrations },
   ];
+
+  const NON_GENERATION_MODES = new Set(["extract", "illustrations"]);
 
   let mode = "pptx";
 
@@ -114,7 +119,7 @@
     else if (mode === "merge") generateBtn.disabled = !mergeSourceFile || mergePixFiles.length === 0;
     else if (mode === "multi") generateBtn.disabled = multiFiles.length < 2;
     else if (mode === "scratch") generateBtn.disabled = !scratchThemeInput.value.trim();
-    else generateBtn.disabled = true; // illustrations: not a generation mode
+    else generateBtn.disabled = true; // extract / illustrations: not generation modes
   }
 
   function setMode(next) {
@@ -126,10 +131,10 @@
       t.panel.hidden = !active;
     }
     // The "titre"/"thematique"/generate button block only applies to the
-    // generation modes — the illustrations tab is a pure library browser,
-    // so hide it there rather than show a "Générer le PPTX" button that
-    // does nothing meaningful in this tab.
-    generationFieldsEl.hidden = mode === "illustrations";
+    // generation modes — the extract and illustrations tabs are utilities
+    // with their own (or no) action button, so hide it there rather than
+    // show a "Générer le PPTX" button that does nothing meaningful in them.
+    generationFieldsEl.hidden = NON_GENERATION_MODES.has(mode);
     setStatus("");
     refreshGenerateEnabled();
     if (mode === "illustrations") refreshIllustrationPanel();
@@ -140,6 +145,7 @@
   tabMerge.addEventListener("click", () => setMode("merge"));
   tabMulti.addEventListener("click", () => setMode("multi"));
   tabScratch.addEventListener("click", () => setMode("scratch"));
+  tabExtract.addEventListener("click", () => setMode("extract"));
   tabIllustrations.addEventListener("click", () => setMode("illustrations"));
 
   /* ---------- Mode 1: adapt an existing PPTX ---------- */
@@ -475,6 +481,54 @@
       "success"
     );
   }
+
+  /* ---------- Mode 6: extract illustrations from a PPTX, no generation ---------- */
+
+  const extractDropzone = document.getElementById("extract-dropzone");
+  const extractFileInput = document.getElementById("extract-file-input");
+  const extractFileNameEl = document.getElementById("extract-file-name");
+  const extractBtn = document.getElementById("extract-btn");
+
+  let extractFile = null;
+
+  function setExtractFile(files) {
+    const file = files && files[0];
+    if (!file) return;
+    if (!/\.pptx$/i.test(file.name)) {
+      setStatus("Le fichier doit être un .pptx.", "error");
+      return;
+    }
+    extractFile = file;
+    extractFileNameEl.textContent = file.name;
+    extractBtn.disabled = false;
+    setStatus("");
+  }
+
+  wireDropzone(extractDropzone, extractFileInput, setExtractFile);
+
+  extractBtn.addEventListener("click", async () => {
+    extractBtn.disabled = true;
+    try {
+      setStatus("Extraction des illustrations en cours…");
+      const buf = await extractFile.arrayBuffer();
+      const pkg = await window.PG_OOXML.PptxPackage.fromArrayBuffer(buf);
+      const { total, added, skipped } = await window.PG_SOURCE.extractAllIllustrations(pkg);
+      await refreshIllustrationPanel();
+      setStatus(
+        total
+          ? `${added} illustration(s) ajoutée(s) à la bibliothèque` +
+              (skipped ? ` (${skipped} déjà présente(s), ignorée(s))` : "") +
+              `.`
+          : "Aucune illustration trouvée dans ce fichier.",
+        "success"
+      );
+    } catch (err) {
+      console.error(err);
+      setStatus(`Erreur : ${err.message}`, "error");
+    } finally {
+      extractBtn.disabled = false;
+    }
+  });
 
   /* ---------- Illustration library panel ---------- */
 
