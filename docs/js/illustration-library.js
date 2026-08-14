@@ -277,12 +277,24 @@
       }
     }
 
+    // Byte-identical pairs already surfaced above as an exact group — an
+    // identical image trivially also hashes to distance 0, so without this
+    // it would show up a second time as a "quasi-doublon" too, cluttering
+    // the exact section this whole tier exists to keep short and reviewable.
+    const exactPairKeys = new Set();
+    for (const group of exactGroups) {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) exactPairKeys.add(`${group[i].id}:${group[j].id}`);
+      }
+    }
+
     const hashed = await Promise.all(all.map((e) => computeAverageHash(e.bytes, e.ext)));
     const nearPairs = [];
     for (let i = 0; i < all.length; i++) {
       if (hashed[i] == null) continue;
       for (let j = i + 1; j < all.length; j++) {
         if (hashed[j] == null) continue;
+        if (exactPairKeys.has(`${all[i].id}:${all[j].id}`)) continue;
         const distance = hammingDistance(hashed[i].hash, hashed[j].hash);
         if (
           distance <= NEAR_DUPLICATE_MAX_DISTANCE &&
