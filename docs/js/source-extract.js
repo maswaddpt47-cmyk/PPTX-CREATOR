@@ -356,6 +356,76 @@
     return { total, added, skipped: total - added };
   }
 
+  // Literal, unmodified heading text on the gabarit's own fixed/boilerplate
+  // slides (Département intro, sommaire placeholder, "pour aller plus
+  // loin", "fin de séance") — recognized by exact match regardless of
+  // slide position, so re-reading a deck this tool itself generated can
+  // reliably skip its own chrome and keep only the actually generated
+  // content.
+  const GABARIT_FIXED_TITLES = new Set([
+    "Le Département en quelques mots...",
+    "Le Département et le numérique",
+    "Une équipe de conseillers numériques à votre service",
+    "Sommaire",
+    "Pour aller plus loin...",
+    "Fin de la séance",
+  ]);
+
+  /* Reads back a deck this tool generated, for the "Créer depuis un thème"
+     revision flow (see scratch-build.js's reviseScratchDeck()) — lets a
+     user hand back an already-downloaded .pptx to start giving
+     modification instructions on it, instead of only being able to revise
+     whatever was generated earlier in the same browser session.
+
+     Unlike extractSourceModel(), which assumes an arbitrary source deck's
+     first two slides are a title page and a programme/sommaire page, this
+     recognizes the gabarit's own fixed boilerplate slides by their literal
+     heading text (GABARIT_FIXED_TITLES) and skips them wherever they fall,
+     keeping every other slide as content.
+
+     Deliberate simplification, flagged rather than silently assumed:
+     section/divider boundaries and the dedicated "closing" slide aren't
+     reconstructed — every remaining slide becomes one flat contentSlides
+     list under a single programme entry. The revision API call re-derives
+     its own section structure from the instruction anyway, so round-
+     tripping the original section boundaries isn't needed for this to
+     work. */
+  async function extractGeneratedDeckModel(pkg) {
+    const slideNums = pkg
+      .listFiles()
+      .map((f) => f.match(/^ppt\/slides\/slide(\d+)\.xml$/))
+      .filter(Boolean)
+      .map((m) => parseInt(m[1], 10))
+      .sort((a, b) => a - b);
+
+    if (!slideNums.length) throw new Error("Aucune diapositive trouvée dans ce fichier.");
+
+    const first = readShapes(await pkg.readXml(`ppt/slides/slide${slideNums[0]}.xml`)).filter((s) => s.text);
+    const title = { main: first[0] ? first[0].text : "", intro: first[1] ? first[1].text : "", tags: [] };
+
+    const contentSlides = [];
+    for (const num of slideNums.slice(1)) {
+      const shapes = readShapes(await pkg.readXml(`ppt/slides/slide${num}.xml`)).filter((s) => s.text);
+      if (!shapes.length) continue;
+      const slideTitle = shapes[0].text.trim();
+      if (GABARIT_FIXED_TITLES.has(slideTitle)) continue;
+      const items = pairItems(shapes.slice(1));
+      if (!items.length) continue; // divider (title only) or genuinely empty
+      contentSlides.push({ title: slideTitle, intro: "", items, image: null, table: null });
+    }
+
+    if (!contentSlides.length) {
+      throw new Error("Aucun contenu reconnu dans ce fichier — a-t-il bien été généré par cet outil ?");
+    }
+
+    return {
+      title,
+      programme: [{ heading: title.main, body: "" }],
+      contentSlides,
+      closing: null,
+    };
+  }
+
   const CLOSING_KEYWORDS = ["recapitulat", "conclusion", "resume", "bilan"];
 
   function looksLikeClosing(title) {
@@ -460,5 +530,12 @@
     return { title, programme, contentSlides, closing, tokenize };
   }
 
-  global.PG_SOURCE = { extractSourceModel, extractAllIllustrations, tokenize, readShapes, pairItems };
+  global.PG_SOURCE = {
+    extractSourceModel,
+    extractAllIllustrations,
+    extractGeneratedDeckModel,
+    tokenize,
+    readShapes,
+    pairItems,
+  };
 })(window);

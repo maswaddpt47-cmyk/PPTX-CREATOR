@@ -265,6 +265,35 @@
     </div>
 
     <div id="scratch-summary" class="pix-summary" hidden></div>
+
+    <div class="field">
+      <label for="scratch-revision-upload-input">
+        Reprendre un PPTX déjà généré par cet outil <span class="optional">— optionnel</span>
+      </label>
+      <input id="scratch-revision-upload-input" type="file" accept=".pptx" />
+      <p class="hint">
+        Pour donner des instructions de modification sur un support généré
+        lors d'une session précédente (avant l'existence de cette
+        fonctionnalité, par exemple) plutôt que de le regénérer depuis le
+        début. Uniquement les fichiers produits par cet outil.
+      </p>
+    </div>
+
+    <div id="scratch-revision-panel" class="field" hidden>
+      <label for="scratch-revision-instruction">Instructions de modification</label>
+      <textarea
+        id="scratch-revision-instruction"
+        rows="3"
+        placeholder="ex. raccourcis la section 2, ajoute un exemple concret sur les mots de passe, rends le ton plus formel…"
+      ></textarea>
+      <p class="hint">
+        S'applique au dernier support généré (ou importé) dans cet onglet.
+        Nécessite la clé API Claude ci-dessus, même si la génération
+        d'origine venait de la bibliothèque hors-ligne — appliquer une
+        consigne en langage naturel n'a pas d'équivalent hors-ligne.
+      </p>
+      <button id="scratch-revision-btn" type="button" disabled>Appliquer les modifications</button>
+    </div>
   </section>
 
   <section id="mode-extract" class="mode-panel" hidden>
