@@ -415,6 +415,7 @@
   const scratchThemesCountEl = document.getElementById("scratch-themes-count");
   const scratchThemesListEl = document.getElementById("scratch-themes-list");
   const scratchRevisionUploadInput = document.getElementById("scratch-revision-upload-input");
+  const scratchRevisionFileNameEl = document.getElementById("scratch-revision-file-name");
   const scratchRevisionPanel = document.getElementById("scratch-revision-panel");
   const scratchRevisionInstructionEl = document.getElementById("scratch-revision-instruction");
   const scratchRevisionBtn = document.getElementById("scratch-revision-btn");
@@ -497,8 +498,16 @@
 
   scratchRevisionUploadInput.addEventListener("change", async () => {
     const file = scratchRevisionUploadInput.files && scratchRevisionUploadInput.files[0];
+    // Clearing .value (so the same filename can be re-picked later and
+    // still fire a fresh change event) resets the native input's own
+    // "aucun fichier choisi" label — confirmed in production: with no
+    // separate display, that made it look like the selection never
+    // registered even though it had. Show the name here instead, before
+    // clearing, so it stays visible regardless of what the native control
+    // shows.
     scratchRevisionUploadInput.value = "";
     if (!file) return;
+    scratchRevisionFileNameEl.textContent = file.name;
     try {
       const buf = await file.arrayBuffer();
       const pkg = await window.PG_OOXML.PptxPackage.fromArrayBuffer(buf);
