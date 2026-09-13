@@ -414,8 +414,19 @@
   const scratchSummaryEl = document.getElementById("scratch-summary");
   const scratchThemesCountEl = document.getElementById("scratch-themes-count");
   const scratchThemesListEl = document.getElementById("scratch-themes-list");
+  const scratchRevisionUploadInput = document.getElementById("scratch-revision-upload-input");
+  const scratchRevisionPanel = document.getElementById("scratch-revision-panel");
+  const scratchRevisionInstructionEl = document.getElementById("scratch-revision-instruction");
+  const scratchRevisionBtn = document.getElementById("scratch-revision-btn");
 
   let scratchAmbianceFiles = [];
+  // The last generated (or imported) content model in this tab, kept only
+  // in memory — not persisted — so "Appliquer les modifications" has
+  // something to hand back to the API. Reset on page reload; that's why
+  // the upload field below exists, to seed it from an already-downloaded
+  // file instead of only ever working within one browser session.
+  let scratchCurrentModel = null;
+  let scratchOutName = "atelier - mis en forme.pptx";
 
   scratchTargetMinutesEl.value = window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
   scratchMinutesPerSlideEl.textContent = window.PG_SCRATCH_BUILD.MINUTES_PER_SLIDE;
@@ -447,7 +458,7 @@
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const targetMinutes = parseInt(scratchTargetMinutesEl.value, 10) || window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
 
-    const { blob, source, reason, themeHeading, slideCount } = await window.PG_SCRATCH_BUILD.generateScratchDeck(gabaritBuffer, {
+    const { blob, model, source, reason, themeHeading, slideCount } = await window.PG_SCRATCH_BUILD.generateScratchDeck(gabaritBuffer, {
       theme,
       notes: scratchNotesInput.value,
       titre: titreInput.value,
@@ -473,14 +484,75 @@
     scratchSummaryEl.innerHTML = `<span class="source-badge ${badgeClass}">${badgeText}</span><p>${detail}</p>`;
     scratchSummaryEl.hidden = false;
 
-    const outName = (titreInput.value.trim() || theme || "atelier") + " - mis en forme.pptx";
-    triggerDownload(blob, outName);
+    scratchCurrentModel = model;
+    scratchOutName = (titreInput.value.trim() || theme || "atelier") + " - mis en forme.pptx";
+    scratchRevisionPanel.hidden = false;
+    triggerDownload(blob, scratchOutName);
     setStatus(
-      `Livrable généré : ${outName}\n${badgeText} — ${detail}` +
+      `Livrable généré : ${scratchOutName}\n${badgeText} — ${detail}` +
         "\nVérifiez les messages d'alerte rouge éventuels avant diffusion.",
       "success"
     );
   }
+
+  scratchRevisionUploadInput.addEventListener("change", async () => {
+    const file = scratchRevisionUploadInput.files && scratchRevisionUploadInput.files[0];
+    scratchRevisionUploadInput.value = "";
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const pkg = await window.PG_OOXML.PptxPackage.fromArrayBuffer(buf);
+      scratchCurrentModel = await window.PG_SOURCE.extractGeneratedDeckModel(pkg);
+      scratchOutName = file.name.replace(/\.pptx$/i, "") + " - modifié.pptx";
+      scratchRevisionPanel.hidden = false;
+      setStatus(
+        `Fichier importé : ${scratchCurrentModel.contentSlides.length} diapositive(s) de contenu reconnue(s). ` +
+          "Vous pouvez maintenant saisir une instruction de modification ci-dessous.",
+        "success"
+      );
+    } catch (err) {
+      setStatus(`Erreur d'import : ${err.message}`, "error");
+    }
+  });
+
+  scratchRevisionBtn.addEventListener("click", async () => {
+    if (!scratchCurrentModel) return;
+    scratchRevisionBtn.disabled = true;
+    try {
+      const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
+      const targetMinutes = parseInt(scratchTargetMinutesEl.value, 10) || window.PG_SCRATCH_BUILD.DEFAULT_TARGET_MINUTES;
+      const { blob, model, slideCount } = await window.PG_SCRATCH_BUILD.reviseScratchDeck(gabaritBuffer, {
+        model: scratchCurrentModel,
+        instruction: scratchRevisionInstructionEl.value,
+        titre: titreInput.value,
+        thematique: thematiqueInput.value,
+        targetMinutes,
+        apiKey: scratchApiKeyInput.value.trim(),
+        ambianceFiles: scratchAmbianceFiles,
+        onStatus: (text) => setStatus(text),
+      });
+      scratchCurrentModel = model; // chain further instructions onto the revised result
+      // Idempotent even across several chained revisions: strips a
+      // trailing " - modifié" first (if the previous round already added
+      // one) so it doesn't pile up into "... - modifié - modifié.pptx".
+      scratchOutName = scratchOutName.replace(/(\s-\smodifié)?\.pptx$/i, "") + " - modifié.pptx";
+      triggerDownload(blob, scratchOutName);
+      setStatus(
+        `Modification appliquée : ${scratchOutName}\n${slideCount} diapositive(s) de contenu.` +
+          "\nVous pouvez enchaîner une nouvelle instruction sur ce résultat, ou revérifier avant diffusion.",
+        "success"
+      );
+      scratchRevisionInstructionEl.value = "";
+    } catch (err) {
+      setStatus(`Erreur : ${err.message}`, "error");
+    } finally {
+      scratchRevisionBtn.disabled = false;
+    }
+  });
+
+  scratchRevisionInstructionEl.addEventListener("input", () => {
+    scratchRevisionBtn.disabled = !scratchRevisionInstructionEl.value.trim();
+  });
 
   /* ---------- Mode 6: extract illustrations from a PPTX, no generation ---------- */
 

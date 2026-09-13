@@ -22,7 +22,8 @@
   const { assembleDeck, computeMaxSlides, MINUTES_PER_SLIDE, DEFAULT_TARGET_MINUTES } = window.PG_BUILD;
   const { matchTheme } = window.PG_PIX_EXTRACT;
   const { THEMES } = window.PG_PIX_THEMES;
-  const { tokenize } = window.PG_SOURCE;
+  const { tokenize, extractGeneratedDeckModel } = window.PG_SOURCE;
+  const { classifyContentSlides } = window.PG_CLASSIFIER;
 
   /* matchTheme()'s keyword-count scoring (MIN_SCORE=2 distinct keyword
      hits) was tuned for OCR'd screenshot text, which is naturally long and
@@ -244,23 +245,61 @@
     };
   }
 
-  async function callClaudeApi({ theme, notes, maxSlides, titre, apiKey, onStatus }) {
+  /* Inverse of modelFromApiResult() — serializes the app's own model shape
+     back into DECK_TOOL's input shape, so a revision prompt can hand the
+     API its own current content to edit. Regroups contentSlides under
+     model.programme the same way build.js's assembleDeck() actually
+     renders them (classifyContentSlides — best keyword match per slide),
+     so what the API sees matches what's really in the deck. */
+  function modelToToolInput(model) {
+    const groups = classifyContentSlides(model.contentSlides, model.programme);
+    const sections = (model.programme.length ? model.programme : [{ heading: model.title.main, body: "" }]).map(
+      (p, i) => ({
+        sectionHeading: p.heading,
+        sectionSummary: p.body,
+        slides: (groups[i] || []).map((s) => ({
+          title: s.title,
+          intro: s.intro || "",
+          items: (s.items || []).map((it) => ({ heading: it.heading || "", body: it.body || "" })),
+        })),
+      })
+    );
+    const out = { titleMain: model.title.main, titleIntro: model.title.intro, sections };
+    if (model.closing) {
+      out.closing = {
+        title: model.closing.title,
+        items: (model.closing.items || []).map((it) => ({ heading: it.heading || "", body: it.body || "" })),
+      };
+    }
+    return out;
+  }
+
+  function buildRevisionPrompt({ model, instruction }) {
+    return (
+      `Voici le contenu actuel, déjà structuré, d'un atelier d'inclusion numérique ` +
+      `(format JSON correspondant à l'outil build_deck_content) :\n\n${JSON.stringify(modelToToolInput(model), null, 2)}\n\n` +
+      `Applique la modification demandée ci-dessous, puis renvoie le contenu COMPLET mis à jour ` +
+      `(pas seulement la partie modifiée) via l'outil build_deck_content — même règles de fond que ` +
+      `pour une génération initiale (français clair, phrases courtes, ton pratique et concret ; tout ` +
+      `accompagnement humain fait référence aux "conseillers et médiateurs numériques du Département", ` +
+      `jamais à France Services).\n\nModification demandée : ${instruction.trim()}`
+    );
+  }
+
+  /* Low-level call shared by from-scratch generation and revision — both
+     just need a fully-built prompt string sent as a single user turn and
+     the DECK_TOOL's structured result back. Kept apiKey required here
+     (not just at the call sites) so neither path can silently skip it. */
+  async function callClaudeApiWithPrompt(prompt, apiKey, onStatus, statusMessage) {
     if (!apiKey) {
       throw new Error(
         "Aucune clé API configurée. Renseignez votre clé API Claude dans le champ prévu pour ce mode."
       );
     }
-    const prompt = buildPrompt({ theme, notes, maxSlides, titre });
-
     // A ~30-slide request can take the API the better part of a minute —
     // confirmed in production: with no feedback during that wait, it was
     // impossible to tell a slow-but-working generation from a hung one.
-    if (onStatus) {
-      onStatus(
-        `Génération du contenu par l'API Claude (${maxSlides} diapositive(s) demandée(s)) — ` +
-          "ça peut prendre 30 à 60 secondes pour une séance longue…"
-      );
-    }
+    if (onStatus) onStatus(statusMessage);
 
     let res;
     try {
@@ -303,6 +342,17 @@
       throw new Error("Réponse de l'API Claude inattendue (pas de contenu structuré reçu).");
     }
     return toolUse.input;
+  }
+
+  async function callClaudeApi({ theme, notes, maxSlides, titre, apiKey, onStatus }) {
+    const prompt = buildPrompt({ theme, notes, maxSlides, titre });
+    return callClaudeApiWithPrompt(
+      prompt,
+      apiKey,
+      onStatus,
+      `Génération du contenu par l'API Claude (${maxSlides} diapositive(s) demandée(s)) — ` +
+        "ça peut prendre 30 à 60 secondes pour une séance longue…"
+    );
   }
 
   /* options: { theme, notes, titre, thematique, targetMinutes, apiKey, forceApi } */
@@ -390,8 +440,48 @@
     return { blob, model, source, reason, themeHeading, slideCount: model.contentSlides.length };
   }
 
+  /* Applies a free-text modification instruction to an already-built model
+     (from an earlier generateScratchDeck() call this session, or read back
+     from a previously downloaded file via extractGeneratedDeckModel()) and
+     rebuilds the deck. Always goes through the API — even when the base
+     content came from the offline curated library, since applying a
+     natural-language edit has no offline equivalent; per the user's own
+     explicit call on this trade-off. options: { model, instruction, titre,
+     thematique, targetMinutes, apiKey, ambianceFiles, onStatus }. */
+  async function reviseScratchDeck(gabaritBuffer, options) {
+    options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
+    if (!options.instruction || !options.instruction.trim()) {
+      throw new Error("Indiquez une instruction de modification.");
+    }
+
+    const maxSlides = computeMaxSlides(options.targetMinutes);
+    const prompt = buildRevisionPrompt({ model: options.model, instruction: options.instruction });
+    const input = await callClaudeApiWithPrompt(
+      prompt,
+      options.apiKey,
+      options.onStatus,
+      "Application de la modification par l'API Claude — ça peut prendre 30 à 60 secondes…"
+    );
+    const model = modelFromApiResult(input, { titre: options.titre, maxSlides });
+
+    const ambianceBytes = await resolveAmbianceBytes(options.ambianceFiles);
+    if (ambianceBytes.length) {
+      model.contentSlides.forEach((slide, i) => {
+        if (!slide.image) slide.image = ambianceBytes[i % ambianceBytes.length];
+      });
+    }
+
+    const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
+    const deck = new DeckBuilder(gabaritPkg);
+    await deck.init();
+    await assembleDeck(deck, model, options);
+    const blob = await deck.finalize();
+    return { blob, model, slideCount: model.contentSlides.length };
+  }
+
   global.PG_SCRATCH_BUILD = {
     generateScratchDeck,
+    reviseScratchDeck,
     getStoredApiKey,
     setStoredApiKey,
     MINUTES_PER_SLIDE,
