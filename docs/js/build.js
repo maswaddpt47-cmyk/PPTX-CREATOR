@@ -289,15 +289,16 @@
     return { groups };
   }
 
-  async function generateDeck(gabaritBuffer, sourceBuffer, options) {
+  /* Shared tail of both generateDeck() (source = an uploaded .pptx) and
+     generateDeckFromDocx() (source = an uploaded .docx, see doc-extract.js):
+     trims the model to the target session length and renders it into a
+     fresh gabarit copy. */
+  async function generateDeckFromModel(gabaritBuffer, model, options) {
     options = Object.assign({ titre: "", thematique: "", targetMinutes: DEFAULT_TARGET_MINUTES }, options);
 
     const gabaritPkg = await PptxPackage.fromArrayBuffer(gabaritBuffer);
     const deck = new DeckBuilder(gabaritPkg);
     await deck.init();
-
-    const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
-    const model = await extractSourceModel(sourcePkg);
 
     // Trim to the target session length, keeping the source's own slide
     // order (earliest content first) — the closing/recap slide and the
@@ -312,8 +313,21 @@
     return { blob, model, groups, keptCount: model.contentSlides.length, droppedCount };
   }
 
+  async function generateDeck(gabaritBuffer, sourceBuffer, options) {
+    const sourcePkg = await PptxPackage.fromArrayBuffer(sourceBuffer);
+    const model = await extractSourceModel(sourcePkg);
+    return generateDeckFromModel(gabaritBuffer, model, options);
+  }
+
+  async function generateDeckFromDocx(gabaritBuffer, sourceBuffer, options) {
+    const model = await window.PG_DOC.parseDocxToModel(sourceBuffer);
+    return generateDeckFromModel(gabaritBuffer, model, options);
+  }
+
   global.PG_BUILD = {
     generateDeck,
+    generateDeckFromDocx,
+    generateDeckFromModel,
     assembleDeck,
     renderContentSlide,
     getImageDimensions,
