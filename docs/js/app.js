@@ -558,7 +558,7 @@
       triggerDownload(blob, scratchOutName);
       setStatus(
         `Modification appliquée : ${scratchOutName}\n${slideCount} diapositive(s) de contenu.` +
-          "\nVous pouvez enchâiner une nouvelle instruction sur ce résultat, ou revérifier avant diffusion.",
+          "\nVous pouvez enchaîner une nouvelle instruction sur ce résultat, ou revérifier avant diffusion.",
         "success"
       );
       scratchRevisionInstructionEl.value = "";
