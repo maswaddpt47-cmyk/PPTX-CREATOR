@@ -4,31 +4,44 @@
 
 ## Décisions à trancher
 
-- **Import d'un fichier .doc/.docx dans le mode "Adapter un PPTX existant".**
-  Deux options proposées à l'utilisateur le 28/09/2026, sans réponse retenue :
-  étendre le dropzone existant (`docs/index.html#mode-pptx`) en détectant le
-  type de fichier déposé, ou ajouter un nouvel onglet dédié avec un parseur
-  Word séparé. Périmètre du format à trancher aussi : `.docx` seul (même
-  famille technique zip+XML que le `.pptx`, réutilise JSZip déjà présent) ou
-  `.doc` + `.docx` (le `.doc` binaire demande une librairie de parsing
-  supplémentaire). Rien à soumettre à l'AGORA tant que le choix n'est pas fait
-  — la décision n'est pas encore prise, donc aucun critère du §2 d'`agora.md`
-  n'est rempli.
+Aucune.
 
 ## Chantiers restants, par priorité
 
-1. Trancher l'approche d'import .doc/.docx (ci-dessus), puis l'implémenter :
-   `docs/js/source-extract.js` lit actuellement la structure OOXML des slides
-   (formes/`xfrm`) — un `.doc`/`.docx` nécessite un parseur de
-   paragraphes/titres distinct, pas une extension du parseur existant.
+1. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
+   existant", `docs/js/doc-extract.js`). Testé le 28/09/2026 dans un bac à
+   sable Node (JSZip + `@xmldom/xmldom`, pas le navigateur) contre un `.docx`
+   construit à la main (XML minimal), pas un export réel Word/LibreOffice :
+   cas nominal (Titre/Sous-titre/Titre 1/Titre 2/Titre 3/listes à puces,
+   détection du récapitulatif) et cas d'erreur (aucun style de titre)
+   passent tous les deux. **Hypothèse non vérifiée** : la détection de style
+   (`normalizeStyleId` dans `doc-extract.js`) suppose que Word et LibreOffice
+   écrivent l'id de style anglais (`Heading1`, `Title`...) même en interface
+   française — pas confirmé sur un vrai fichier exporté par l'un ou l'autre.
+   À tester avec un vrai `.docx` déposé dans l'outil en ligne avant de
+   considérer le chantier clos.
 
 ## Points à ne pas défaire
 
 - Le mode "Adapter un PPTX existant" (`docs/index.html` id `mode-pptx`,
-  dropzone `#file-input` limité à `.pptx`) s'appuie sur
-  `docs/js/source-extract.js`, qui extrait le contenu par position des formes
-  (`xfrm`) dans le XML des slides — pas de parsing texte brut. Toute
-  extension à un autre format source (Word, etc.) doit passer par un
-  parseur séparé ; adapter ce fichier pour lire du texte brut casserait
-  l'extraction PPTX existante (positionnement, tableaux détectés par
-  position).
+  dropzone `#file-input`, accepte `.pptx` et `.docx`) route selon
+  l'extension : `.pptx` → `docs/js/source-extract.js` (lecture par position
+  des formes/`xfrm` dans le XML des slides), `.docx` →
+  `docs/js/doc-extract.js` (lecture par styles de paragraphe Word). Les deux
+  produisent la même forme de modèle (`title`/`programme`/`contentSlides`/
+  `closing`, voir l'en-tête de `build.js:227`) consommée par
+  `assembleDeck()` — `generateDeckFromModel()` dans `build.js` est le point
+  d'entrée partagé, ne pas dupliquer la logique de rendu si un troisième
+  format source doit être ajouté un jour.
+- `.doc` (Word 97-2003, format binaire OLE2, pas du XML) est **refusé**
+  côté dropzone (`app.js`) avec un message renvoyant vers un
+  réenregistrement en `.docx` — décision prise le 28/09/2026 : pas de
+  bibliothèque JS fiable pour le lire côté navigateur, et un parseur maison
+  (format OLE2/FIB) n'aurait pas pu être vérifié dans cet environnement. Ne
+  pas réintroduire de tentative de lecture `.doc` sans un vrai fichier de
+  test et un moyen de vérifier le résultat.
+- L'import `.docx` ne lit que le texte et la structure (styles de titre) :
+  les images éventuellement présentes dans le `.docx` source ne sont pas
+  extraites — chaque diapositive de contenu retombe sur la bibliothèque
+  d'illustrations comme n'importe quelle diapositive `.pptx` sans image
+  propre (`pickImage()` dans `build.js`).
