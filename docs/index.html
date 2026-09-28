@@ -48,17 +48,23 @@
 
   <section id="mode-pptx" class="mode-panel">
     <p class="lead">
-      Déposez le PPTX source de votre atelier : il sera automatiquement mis
-      en forme selon le gabarit du Département.
+      Déposez le support source de votre atelier (.pptx ou .docx) : il sera
+      automatiquement mis en forme selon le gabarit du Département.
     </p>
     <section id="dropzone" class="dropzone" tabindex="0">
       <div class="dropzone-inner">
-        <p class="dropzone-title">Glissez votre fichier .pptx ici</p>
+        <p class="dropzone-title">Glissez votre fichier .pptx ou .docx ici</p>
         <p class="dropzone-sub">ou cliquez pour sélectionner un fichier</p>
         <p id="file-name" class="file-name"></p>
       </div>
-      <input id="file-input" type="file" accept=".pptx" hidden />
+      <input id="file-input" type="file" accept=".pptx,.docx" hidden />
     </section>
+    <p class="hint">
+      Un .docx doit être structuré avec les styles de titre de Word (Titre
+      1, Titre 2...) pour être découpé en sections et diapositives. Un
+      ancien .doc (Word 97-2003) n'est pas lisible directement — réenregistrez-le
+      en .docx depuis Word ou LibreOffice (Fichier → Enregistrer sous).
+    </p>
 
     <div class="field">
       <label for="pptx-target-minutes">Durée cible de la séance (minutes)</label>
@@ -385,6 +391,7 @@
 <script src="js/ooxml.js"></script>
 <script src="js/gabarit.js"></script>
 <script src="js/source-extract.js"></script>
+<script src="js/doc-extract.js"></script>
 <script src="js/illustration-library.js"></script>
 <script src="js/classifier.js"></script>
 <script src="js/build.js"></script>
