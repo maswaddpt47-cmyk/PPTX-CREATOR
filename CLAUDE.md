@@ -2,6 +2,43 @@
 
 - Toujours faire un `git pull` depuis GitHub avant de commencer à travailler, afin de partir de l'état le plus récent du dépôt.
 - Toujours merger les changements sur la branche `main` une fois le travail terminé.
+- Voir `CHANTIERS.md` à la racine pour l'état du projet, les décisions à
+  trancher et les chantiers en cours, par ordre de priorité — à consulter en
+  début de session, avant de lire le reste de ce fichier.
+
+## AGORA — faire contredire une décision par une autre session
+
+Soumettre à l'AGORA (bloc ajouté dans `AGORA.md` à la racine) dès qu'un de ces
+faits est constaté :
+
+1. La décision ferme une porte (schéma de données, format de stockage,
+   nouvelle dépendance, contrat entre modules).
+2. Deux options ont été envisagées, une seule a été écrite, sans arbitrage
+   extérieur.
+3. Trois itérations sans résolution sur le même problème.
+4. Proposition de défaire un existant dont la raison d'être n'est pas
+   retrouvée.
+5. La proposition contredit une note datée du dépôt (`CLAUDE.md`,
+   `CHANTIERS.md`, commentaire de décision).
+6. Coût irréversible côté usager (suppression de données, migration, rupture
+   d'une PWA déjà installée).
+
+Rappel : toute entrée « décision à trancher » du `CHANTIERS.md` est par
+définition un candidat.
+
+Ne va **pas** à l'AGORA : changement de rendu pur, correctif localisé appuyé
+sur une preuve (log, test rouge puis vert), tout ce qui se défait en un
+commit.
+
+Claude soumet d'office, sans demander l'autorisation : il écrit le bloc, le
+commite, et fournit la phrase de relais à coller dans l'autre session.
+**L'AGORA ne bloque jamais** — le travail continue en parallèle. C'est
+l'utilisateur qui décide de coller la phrase de relais ou non, et qui tranche
+in fine.
+
+Gabarit du bloc, règles de réponse (jamais répondre à son propre bloc,
+append-only + push direct sur `main`, aucune donnée d'usager) et section
+« Sincérité » : voir `AGORA.md`.
 
 ## Règles de collaboration avec Claude
 

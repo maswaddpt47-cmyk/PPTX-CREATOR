@@ -164,8 +164,15 @@
   function setFile(files) {
     const file = files && files[0];
     if (!file) return;
-    if (!/\.pptx$/i.test(file.name)) {
-      setStatus("Le fichier doit être un .pptx.", "error");
+    if (/\.doc$/i.test(file.name)) {
+      setStatus(
+        "Le format .doc (Word 97-2003) n'est pas pris en charge. Réenregistrez ce fichier en .docx depuis Word ou LibreOffice (Fichier → Enregistrer sous), puis déposez-le à nouveau.",
+        "error"
+      );
+      return;
+    }
+    if (!/\.(pptx|docx)$/i.test(file.name)) {
+      setStatus("Le fichier doit être un .pptx ou un .docx.", "error");
       return;
     }
     sourceFile = file;
@@ -180,14 +187,17 @@
     const gabaritBuffer = base64ToArrayBuffer(window.PG_GABARIT_BASE64);
     const sourceBuffer = await sourceFile.arrayBuffer();
     const targetMinutes = parseInt(pptxTargetMinutesEl.value, 10) || window.PG_BUILD.DEFAULT_TARGET_MINUTES;
+    const isDocx = /\.docx$/i.test(sourceFile.name);
 
-    const { blob, keptCount, droppedCount } = await window.PG_BUILD.generateDeck(gabaritBuffer, sourceBuffer, {
+    const { blob, keptCount, droppedCount } = await (isDocx
+      ? window.PG_BUILD.generateDeckFromDocx
+      : window.PG_BUILD.generateDeck)(gabaritBuffer, sourceBuffer, {
       titre: titreInput.value,
       thematique: thematiqueInput.value,
       targetMinutes,
     });
 
-    const outName = sourceFile.name.replace(/\.pptx$/i, "") + " - mis en forme.pptx";
+    const outName = sourceFile.name.replace(/\.(pptx|docx)$/i, "") + " - mis en forme.pptx";
     triggerDownload(blob, outName);
     setStatus(
       `Livrable généré : ${outName}\n${keptCount} section(s) retenue(s)` +
