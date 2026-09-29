@@ -19,7 +19,10 @@ Aucune.
    en Node sur le classifieur seul, pas dans le navigateur : à confirmer
    en régénérant un deck depuis l'outil en ligne. L'ordre *à l'intérieur*
    d'une section reste celui renvoyé par l'API (ex. "Qu'est-ce qu'une
-   pièce jointe ?" après "Étape 1") — pas traité, relève du prompt.
+   pièce jointe ?" après "Étape 1") : règle ajoutée au prompt le
+   29/09/2026 (génération, révision et schéma de l'outil : notions, puis
+   étapes numérotées, puis conseils). Consigne au modèle, pas une
+   contrainte : à vérifier sur la même régénération.
 2. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
    existant", `docs/js/doc-extract.js`). Testé le 28/09/2026 dans un bac à
    sable Node (JSZip + `@xmldom/xmldom`, pas le navigateur) contre un `.docx`

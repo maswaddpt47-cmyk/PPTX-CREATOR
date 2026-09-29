@@ -136,7 +136,7 @@
               sectionSummary: { type: "string", description: "Une phrase résumant la section (sommaire)." },
               slides: {
                 type: "array",
-                description: "Diapositives de contenu de cette section.",
+                description: "Diapositives de contenu de cette section, dans l'ordre d'affichage : notions d'abord, puis étapes numérotées dans l'ordre, puis conseils et erreurs à éviter.",
                 items: {
                   type: "object",
                   properties: {
@@ -191,6 +191,10 @@
       `- Français clair, phrases courtes, zéro jargon non expliqué.\n` +
       `- Ton pratique et concret : quoi faire, comment, dans quel ordre — pas de discours théorique.\n` +
       `- Découpe le thème en sections cohérentes, chacune avec quelques diapositives de contenu.\n` +
+      `- Dans chaque section, place d'abord les diapositives qui expliquent une notion ("Qu'est-ce ` +
+      `qu'une pièce jointe ?"), puis les étapes pratiques numérotées dans l'ordre (Étape 1, 2, 3…), ` +
+      `puis les conseils, erreurs à éviter et vérifications. Toutes les étapes d'une même procédure ` +
+      `restent dans la même section.\n` +
       `- Prévois au total environ ${maxSlides} diapositive(s) de contenu (hors page de titre, sommaire, ` +
       `dividers de section et récapitulatif final).\n` +
       `- Termine par une diapositive de récapitulatif ("closing") avec les points clés à retenir.\n` +
@@ -285,7 +289,8 @@
       `(pas seulement la partie modifiée) via l'outil build_deck_content — même règles de fond que ` +
       `pour une génération initiale (français clair, phrases courtes, ton pratique et concret ; tout ` +
       `accompagnement humain fait référence aux "conseillers et médiateurs numériques du Département", ` +
-      `jamais à France Services).\n\nModification demandée : ${instruction.trim()}`
+      `jamais à France Services ; dans chaque section, notions d'abord, puis étapes numérotées dans ` +
+      `l'ordre, puis conseils et erreurs à éviter).\n\nModification demandée : ${instruction.trim()}`
     );
   }
 
