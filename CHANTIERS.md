@@ -1,6 +1,6 @@
 # CHANTIERS — PPTX-CREATOR
 
-État au 28/09/2026 — commit de référence `ab583e3`.
+État au 29/09/2026.
 
 ## Décisions à trancher
 
@@ -8,7 +8,19 @@ Aucune.
 
 ## Chantiers restants, par priorité
 
-1. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
+1. **Vérification terrain du correctif d'ordre des slides en mode "Depuis
+   un thème"** (29/09/2026). Constaté sur un deck généré par l'API
+   ("Créer une adresse mail et envoyer un mail avec une pièce jointe") :
+   Étapes 2 et 5 de la création de compte rangées sous "Comprendre le
+   mail", "Qu'est-ce qu'un mail ?" sous la dernière partie. Cause :
+   `modelFromApiResult()` aplatissait les sections renvoyées par l'API, et
+   `classifyContentSlides()` les redevinait par mots communs. Correctif :
+   chaque slide porte `sectionIndex`, respecté par le classifieur. Testé
+   en Node sur le classifieur seul, pas dans le navigateur : à confirmer
+   en régénérant un deck depuis l'outil en ligne. L'ordre *à l'intérieur*
+   d'une section reste celui renvoyé par l'API (ex. "Qu'est-ce qu'une
+   pièce jointe ?" après "Étape 1") — pas traité, relève du prompt.
+2. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
    existant", `docs/js/doc-extract.js`). Testé le 28/09/2026 dans un bac à
    sable Node (JSZip + `@xmldom/xmldom`, pas le navigateur) contre un `.docx`
    construit à la main (XML minimal), pas un export réel Word/LibreOffice :
@@ -22,6 +34,11 @@ Aucune.
    considérer le chantier clos.
 
 ## Points à ne pas défaire
+
+- `sectionIndex` sur les slides du mode "Depuis un thème"
+  (`scratch-build.js`) : la section est connue à la génération, ne pas la
+  laisser redeviner par `classifyContentSlides()` (heuristique réservée
+  aux sources importées, où la section n'est pas connue).
 
 - Le mode "Adapter un PPTX existant" (`docs/index.html` id `mode-pptx`,
   dropzone `#file-input`, accepte `.pptx` et `.docx`) route selon

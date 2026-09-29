@@ -19,6 +19,18 @@
   function classifyContentSlides(contentSlides, programme) {
     if (!programme.length) return [contentSlides.slice()];
 
+    // Slides whose section is already known (from-scratch mode: the API
+    // returns each slide inside its section) keep it — re-guessing by
+    // keyword overlap scattered them across sections (constaté le
+    // 29/09/2026 sur un deck "Créer une adresse mail…" : Étapes 2 et 5 de
+    // la création de compte rangées sous "Comprendre le mail").
+    const known = (s) => Number.isInteger(s.sectionIndex) && s.sectionIndex >= 0 && s.sectionIndex < programme.length;
+    if (contentSlides.length && contentSlides.every(known)) {
+      const byIndex = programme.map(() => []);
+      for (const slide of contentSlides) byIndex[slide.sectionIndex].push(slide);
+      return byIndex;
+    }
+
     const catTokenSets = programme.map(
       (c) => new Set(tokenize(`${c.heading} ${c.body}`))
     );
