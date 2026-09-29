@@ -116,9 +116,14 @@
     const shape = findShapeByName(doc, "Subtitle 2") || findShapeByPhType(doc, "subTitle");
     if (!shape) throw new Error("Eyebrow/subtitle placeholder not found");
     const p = paragraphs(shape)[0];
-    const value = text && text.trim() ? text.trim() : alertText("thématique (page de titre)");
-    setParagraphText(p, value);
-    if (!text || !text.trim()) markRunRed(p);
+    if (text && text.trim()) {
+      setParagraphText(p, text.trim());
+      return;
+    }
+    // Thématique facultative (29/09/2026) : champ vide = bandeau vert
+    // conservé sans texte, plus d'alerte rouge. La forme porte le fond du
+    // bandeau, on ne la supprime pas.
+    for (const r of runsOf(p)) r.parentNode.removeChild(r);
   }
 
   /* Sommaire slide: replace the (up to 4) numbered item paragraphs inside
