@@ -105,7 +105,8 @@
     return {
       title: { main: (titre || "").trim() || themes[0].title, intro: "", tags: [] },
       programme: themes.map((t) => ({ heading: t.heading, body: t.programmeBody })),
-      contentSlides: themes.map((t) => ({
+      contentSlides: themes.map((t, sectionIndex) => ({
+        sectionIndex,
         title: t.title,
         intro: t.intro,
         items: t.items.map(([heading, body]) => ({ heading, body })),
@@ -210,9 +211,11 @@
     const contentSlides = [];
     const programme = [];
     for (const section of sections) {
+      const sectionIndex = programme.length;
       programme.push({ heading: section.sectionHeading || "", body: section.sectionSummary || "" });
       for (const slide of section.slides || []) {
         contentSlides.push({
+          sectionIndex,
           title: slide.title || "",
           intro: slide.intro || "",
           items: (slide.items || []).map((it) => ({ heading: it.heading || "", body: it.body || "" })),
