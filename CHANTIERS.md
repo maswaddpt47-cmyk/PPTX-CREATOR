@@ -8,19 +8,18 @@ Aucune.
 
 ## Chantiers restants, par priorité
 
-1. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
-   existant", `docs/js/doc-extract.js`). L'hypothèse du 28/09/2026 (Word
-   écrit l'id de style anglais `Heading1` même en interface française)
-   est **réfutée** le 30/09/2026 par un vrai export Word FR ("Prompt
-   Entretien IA.docx") : id `Titre1`/`Titre2`, nom `heading 1`/`heading 2`
-   dans `word/styles.xml`. L'outil refusait le fichier ("aucun style de
-   titre"). Correctif : classement par le *nom* du style lu dans
-   `styles.xml`, l'id en repli. Testé en Node sur ce fichier (erreur
-   avant, 1 section + 7 diapositives après) — pas encore dans le
-   navigateur, et LibreOffice toujours non testé. Clore après une
-   génération réussie depuis l'outil en ligne.
+Aucun. (Import .docx Word FR confirmé par l'utilisateur le 30/09/2026 sur
+"Prompt Entretien IA.docx" ; LibreOffice jamais testé — à rouvrir si un
+export LibreOffice est refusé.)
 
 ## Points à ne pas défaire
+
+- Import .docx : style de titre reconnu par son *nom* dans
+  `word/styles.xml` ("heading 1"), pas par son id — Word FR écrit l'id
+  `Titre1` (constaté le 30/09/2026). Ne pas revenir à un test sur l'id.
+- Diapo sans cartouche mais avec une intro (`renderContentSlide()`,
+  `build.js`) : l'intro devient l'unique cartouche. L'alerte « contenu de
+  cette diapositive » est réservée aux diapos réellement vides.
 
 - `sectionIndex` sur les slides du mode "Depuis un thème"
   (`scratch-build.js`) : la section est connue à la génération, ne pas la
