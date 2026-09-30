@@ -186,9 +186,16 @@
     const mediaPath = image ? deck.importMedia(image.bytes, image.ext) : null;
     const clone = await deck.cloneSlide(7);
     const doc = await deck.loadSlideDoc(clone.num);
-    const items = slide.items.length
-      ? slide.items
-      : [{ heading: "", body: G.alertText("contenu de cette diapositive") }];
+    // A slide whose only text is its intro (e.g. a .docx Titre 2 followed
+    // by a single paragraph — constaté le 30/09/2026) shows that text as its
+    // one card instead of an empty-content alert next to it.
+    let intro = slide.intro;
+    let items = slide.items;
+    if (!items.length && intro) {
+      items = [{ heading: "", body: intro }];
+      intro = "";
+    }
+    if (!items.length) items = [{ heading: "", body: G.alertText("contenu de cette diapositive") }];
     // hasImage can come back false even when a mediaPath was resolved:
     // fillCardLayout() drops the side illustration in favor of a fuller
     // 2-column text layout when a dense card slide otherwise wouldn't fit
@@ -199,7 +206,7 @@
     // placeholder instead of silently using the full text width.
     const { imageSlot, hasImage } = G.fillCardLayout(doc, {
       title: slide.title,
-      intro: slide.intro,
+      intro,
       items,
       missingTitle: !slide.title,
       hasImage: !!mediaPath,
