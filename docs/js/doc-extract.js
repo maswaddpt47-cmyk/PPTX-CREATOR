@@ -32,14 +32,30 @@
     return root.getElementsByTagNameNS(W_NS, local)[0] || null;
   }
 
-  /* Word/LibreOffice both normally write the English style id
-     ("Heading1", "Title"...) regardless of UI language, but LibreOffice can
-     encode a space in it as "_20_" or "_x0020_" — normalize before
-     matching. *Hypothèse non vérifiée* : testé contre un .docx construit à
-     la main (XML minimal), pas un export réel de Word ni de LibreOffice —
-     voir CHANTIERS.md. */
+  /* The style *id* follows the UI language: a real Word FR export
+     (constaté le 30/09/2026) writes "Titre1"/"Titre2", not "Heading1".
+     The style *name* in word/styles.xml stays the built-in English one
+     ("heading 1", "Title"...), so classification goes through the name
+     (see readStyleNames()), the id being only a fallback. LibreOffice can
+     encode a space in the id as "_20_" or "_x0020_" — normalize anyway. */
   function normalizeStyleId(id) {
     return (id || "").replace(/_x0020_/gi, " ").replace(/_20_/g, " ").trim();
+  }
+
+  /* styleId -> built-in name, e.g. "Titre1" -> "heading 1". Empty map if
+     the .docx has no styles.xml (then ids alone are matched). */
+  async function readStyleNames(zip) {
+    const names = new Map();
+    const file = zip.file("word/styles.xml");
+    if (!file) return names;
+    const doc = new DOMParser().parseFromString(await file.async("string"), "application/xml");
+    for (const st of wTag(doc, "style")) {
+      const id = st.getAttributeNS(W_NS, "styleId") || st.getAttribute("w:styleId");
+      const nameEl = firstWTag(st, "name");
+      const name = nameEl && (nameEl.getAttributeNS(W_NS, "val") || nameEl.getAttribute("w:val"));
+      if (id && name) names.set(id, name);
+    }
+    return names;
   }
 
   function paragraphStyleId(p) {
@@ -110,9 +126,14 @@
       throw new Error("Impossible de lire ce .docx (XML invalide).");
     }
 
+    const styleNames = await readStyleNames(zip);
     const body = firstWTag(doc, "body");
     const paragraphs = wTag(body, "p")
-      .map((p) => ({ style: classifyStyle(paragraphStyleId(p)), text: paragraphText(p) }))
+      .map((p) => {
+        const id = paragraphStyleId(p);
+        const byName = classifyStyle(normalizeStyleId(styleNames.get(id)));
+        return { style: byName || classifyStyle(id), text: paragraphText(p) };
+      })
       .filter((p) => p.text);
 
     const hasHeading = paragraphs.some((p) => /^h[1-9]$/.test(p.style));

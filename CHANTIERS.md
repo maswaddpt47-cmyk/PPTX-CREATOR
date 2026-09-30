@@ -9,17 +9,16 @@ Aucune.
 ## Chantiers restants, par priorité
 
 1. **Vérification terrain de l'import .docx** (mode "Adapter un PPTX
-   existant", `docs/js/doc-extract.js`). Testé le 28/09/2026 dans un bac à
-   sable Node (JSZip + `@xmldom/xmldom`, pas le navigateur) contre un `.docx`
-   construit à la main (XML minimal), pas un export réel Word/LibreOffice :
-   cas nominal (Titre/Sous-titre/Titre 1/Titre 2/Titre 3/listes à puces,
-   détection du récapitulatif) et cas d'erreur (aucun style de titre)
-   passent tous les deux. **Hypothèse non vérifiée** : la détection de style
-   (`normalizeStyleId` dans `doc-extract.js`) suppose que Word et LibreOffice
-   écrivent l'id de style anglais (`Heading1`, `Title`...) même en interface
-   française — pas confirmé sur un vrai fichier exporté par l'un ou l'autre.
-   À tester avec un vrai `.docx` déposé dans l'outil en ligne avant de
-   considérer le chantier clos.
+   existant", `docs/js/doc-extract.js`). L'hypothèse du 28/09/2026 (Word
+   écrit l'id de style anglais `Heading1` même en interface française)
+   est **réfutée** le 30/09/2026 par un vrai export Word FR ("Prompt
+   Entretien IA.docx") : id `Titre1`/`Titre2`, nom `heading 1`/`heading 2`
+   dans `word/styles.xml`. L'outil refusait le fichier ("aucun style de
+   titre"). Correctif : classement par le *nom* du style lu dans
+   `styles.xml`, l'id en repli. Testé en Node sur ce fichier (erreur
+   avant, 1 section + 7 diapositives après) — pas encore dans le
+   navigateur, et LibreOffice toujours non testé. Clore après une
+   génération réussie depuis l'outil en ligne.
 
 ## Points à ne pas défaire
 
