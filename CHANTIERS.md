@@ -52,3 +52,15 @@ export LibreOffice est refusé.)
   extraites — chaque diapositive de contenu retombe sur la bibliothèque
   d'illustrations comme n'importe quelle diapositive `.pptx` sans image
   propre (`pickImage()` dans `build.js`).
+
+## Pistes d'amélioration
+
+Règle 22 de MD-LIB `collaboration.md` : au plus 3 pistes, à la fin d'une
+fonctionnalité validée ou sur demande de revue. Une piste écartée ne se
+repropose pas sans fait nouveau.
+
+**Proposées, en attente**
+_(aucune)_
+
+**Écartées** (date — piste — raison)
+_(aucune)_
