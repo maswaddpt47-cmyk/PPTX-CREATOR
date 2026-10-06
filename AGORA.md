@@ -43,6 +43,19 @@ phrase à coller ailleurs, l'autre session répond, l'utilisateur tranche.
 **Aucune notification ne passe d'un compte à l'autre** : le relais par
 l'utilisateur est obligatoire, et c'est pour ça que l'AGORA ne bloque jamais.
 
+## Contradicteur Codex — blocs de sécurité (06/10/2026)
+
+Un bloc qui touche à la sécurité, aux mots de passe ou aux données personnelles
+va à **Codex (OpenAI)**, pas à une session Claude : entre deux Claude, 0
+« contredit » sur 23 blocs (ATELIERS_NEWGEN), quand Codex a trouvé en une passe
+ce que Claude avait manqué. L'utilisateur colle le bloc dans Codex
+(autorisations « Lecture seule », réflexion au plus haut) avec : « Réponds selon
+le gabarit de AGORA.md, avec fichier:ligne ; ne modifie rien. » La session qui a
+ouvert le bloc inscrit la réponse **telle quelle** sous
+`### Réponse — Codex — JJ/MM/AAAA`, sans la reformuler ni la juger ;
+l'utilisateur tranche. Codex ne modifie jamais le code. Règle complète : MD-LIB
+`agora.md` §12.
+
 ## Gabarit
 
 ```markdown

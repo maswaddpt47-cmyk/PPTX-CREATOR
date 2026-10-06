@@ -40,6 +40,12 @@ Gabarit du bloc, règles de réponse (jamais répondre à son propre bloc,
 append-only + push direct sur `main`, aucune donnée d'usager) et section
 « Sincérité » : voir `AGORA.md`.
 
+**Sécurité, mots de passe, données personnelles : contradicteur Codex**
+(OpenAI) au lieu d'une session Claude (06/10/2026, mode d'emploi : `AGORA.md`).
+**Audit Codex** chaque trimestre et après tout changement structurant de
+sécurité, avec le modèle MD-LIB `consigne-audit-externe.md` ; chaque point
+vérifié dans le code avant d'être retenu, rapport hors dépôt public.
+
 ## Règles de collaboration avec Claude
 
 ### Côté Claude
