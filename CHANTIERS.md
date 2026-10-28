@@ -1,6 +1,6 @@
 # CHANTIERS — PPTX-CREATOR
 
-État au 29/09/2026.
+État au **28/10/2026** (relu : aucun chantier ni décision depuis le 30/09).
 
 ## Décisions à trancher
 
@@ -25,10 +25,8 @@ export LibreOffice est refusé.)
   (`scratch-build.js`) : la section est connue à la génération, ne pas la
   laisser redeviner par `classifyContentSlides()` (heuristique réservée
   aux sources importées, où la section n'est pas connue). Vérifié le
-  29/09/2026 sur un deck régénéré depuis l'outil en ligne ("Créer une
-  adresse mail…") : chaque slide dans sa partie, notions avant étapes
-  numérotées, conseils en fin de partie (consigne du prompt respectée sur
-  cette génération — une seule, pas une garantie).
+  29/09/2026 sur une seule génération ("Créer une adresse mail…") : pas
+  une garantie.
 
 - Le mode "Adapter un PPTX existant" (`docs/index.html` id `mode-pptx`,
   dropzone `#file-input`, accepte `.pptx` et `.docx`) route selon
@@ -55,10 +53,7 @@ export LibreOffice est refusé.)
 
 ## Pistes d'amélioration
 
-Consigne renforcée et propagation approuvée par l'utilisateur le 25/10/2026 :
-initiative dès l'analyse, recommandations argumentées et examen de la pertinence
-de l'existant. Règle 22 de MD-LIB copiée dans `CLAUDE.md` ; ce registre garde
-les pistes et les décisions, sans reproposer une piste écartée sans fait nouveau.
+Règle 8bis du `CLAUDE.md` ; ne pas reproposer une piste écartée sans fait nouveau.
 
 **Proposées, en attente**
 _(aucune)_
